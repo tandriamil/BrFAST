@@ -1,0 +1,8 @@
+# Libraries used
+python-dateutil==2.8.1
+loguru==0.5.3
+sortedcontainers==2.3.0
+
+# Utilities
+pip==21.0.1
+setuptools==53.1.0

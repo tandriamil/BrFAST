@@ -1,0 +1,9 @@
+/* Separate the rows with a padding of 15px */
+.row {
+  margin-top: 15px;
+}
+
+/* Center the text of the footer (license) */
+footer {
+  text-align: center;
+}
