@@ -30,4 +30,4 @@ This directory is dedicated to the design of the graphical interfaces of BrFAST.
 
 ## Resources
 - Thanks to Tom Roth for his tutorials on
-  [D3.js force directed graphs](https://tomroth.com.au/fdg-basics).
+  [D3.js force directed graphs](https://tomroth.com.au/d3).
