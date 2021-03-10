@@ -106,7 +106,7 @@ Below, we describe the content of each module of this project.
 `example_basic` contains an example of execution of the FPSelect algorithm.
 
 - `main.py` is the executable script to run the simple example.
-  * `MySensitivity` is a simple sensibility function used for this example.
+  * `MySensitivity` is a simple sensitivity function used for this example.
   * `MyCost` is a simple usability cost function used for this example.
 
 ### fpselect
@@ -123,7 +123,7 @@ interfaces.
   * `Cost` is the representation of the usability cost.
   * `CostFunction` is the interface of the usability cost measure.
 - `sensitivity.py` contains the `SensitivityFunction` interface for the
-  sensibility measure.
+  sensitivity measure.
 
 ### gui
 
@@ -137,7 +137,7 @@ The attribute selection tool is under development on a private repository. This
 one is a public mirror that will include the features when they are ready. The
 features to come are listed below.
 
-- [ ] Implementation of a sensibility measure by the proportion of the users
+- [ ] Implementation of a sensitivity measure by the proportion of the users
   that share the most common fingerprints.
 - [ ] Implementation of a usability cost measure that captures the size and
   the instability of the generated fingerprints.
@@ -150,7 +150,7 @@ features to come are listed below.
 - [ ] Implementation of the visualization of the current state of the   
   exploration of the possibilities as a graph using the D3JS library.
 - [ ] Implementation of the visualization of the information on the generated
-  fingerprints given an attribute set, displaying their sensibility, their
+  fingerprints given an attribute set, displaying their sensitivity, their
   usability cost, their unicity, their entropy, their stability, and a sample
   of the resulting fingerprints.
 - [ ] Implementation of the replay of an execution trace.
