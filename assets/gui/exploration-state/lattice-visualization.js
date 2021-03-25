@@ -34,15 +34,39 @@ var sensitivityThreshold = 0.15;
 // ##### Create the data
 // The nodes
 var nodesData =  [
-  {'id': 1, 'nb_attributes': 0, 'sensitivity': 1.0, 'usability_cost': 0},
-  {'id': 2, 'nb_attributes': 1, 'sensitivity': 0.3, 'usability_cost': 10},
-  {'id': 3, 'nb_attributes': 1, 'sensitivity': 0.3, 'usability_cost': 15},
-  {'id': 4, 'nb_attributes': 1, 'sensitivity': 0.25, 'usability_cost': 15},
-  {'id': 5, 'nb_attributes': 2, 'sensitivity': 0.15, 'usability_cost': 20},
-  {'id': 6, 'nb_attributes': 2, 'sensitivity': 0.25, 'usability_cost': 17},
-  {'id': 7, 'nb_attributes': 2, 'sensitivity': 0.20, 'usability_cost': 25},
-  {'id': 8, 'nb_attributes': 3, 'sensitivity': 0.05, 'usability_cost': 30},
+  {'id': 1, 'attributes': [], 'sensitivity': 1.0, 'usability_cost': 0},
+  {'id': 2, 'attributes': [1], 'sensitivity': 0.3, 'usability_cost': 10},
+  {'id': 3, 'attributes': [2], 'sensitivity': 0.3, 'usability_cost': 15},
+  {'id': 4, 'attributes': [3], 'sensitivity': 0.25, 'usability_cost': 15},
+  {'id': 5, 'attributes': [1, 2], 'sensitivity': 0.15, 'usability_cost': 20},
+  {'id': 6, 'attributes': [1, 3], 'sensitivity': 0.25, 'usability_cost': 17},
+  {'id': 7, 'attributes': [2, 3], 'sensitivity': 0.20, 'usability_cost': 25},
+  {'id': 8, 'attributes': [1, 2, 3], 'sensitivity': 0.05, 'usability_cost': 30},
 ];
+
+/**
+ * Below is an example of the informations that an attribute should contain:
+ * - Note that the id of the attribute set is given by the order in which the
+ *   attribute sets are explored. Use a SortedSet on the Python side to hold
+ *   this order.
+ *
+ * The different values for the state (drawn with different colours):
+ * - 1: explored
+ * - 2: pruned (i.e., the supersets are not explored)
+ * - 3: satisfying the sensitivity threshold
+ *
+ * NOTE The pruned state can only be computed on the backend side, whereas the
+ *      less costly attribute set currently found can be computed on the client
+ *      side. The main reason is that the comparison between the attribute sets
+ *      is done on the Python backend side, hence some pruning methods would be
+ *      impossible or at least too costly to recompute on the JS side.
+ */
+var attributeData = {
+  'id': 42, 'attributes': [1, 3, 4, 8, 9], 'sensitivity': 0.15,
+  'usability_cost': 1500,
+  'cost_explanation': { 'time': 150, 'memory': 4500, 'instability': 0.05 },
+  'state': 1
+}
 
 // The links
 var linksData = [

@@ -23,6 +23,7 @@ BrFAST (Browser Fingerprinting Attribute Selection Tool)
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#testing-code-coverage-and-documentation-generation">Testing, code coverage and documentation generation</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -89,10 +90,33 @@ installed on your system.
 ## Usage
 
 For now, you can execute the simple example that is provided in the module
-named `example_basic`. To do so, you can execute the following command:
+`executables.simple_example`. To do so, you can execute the following command:
 
 ```sh
-python -m example_basic.main
+python -m executables.simple_example
+```
+
+
+
+## Testing, code coverage and documentation generation
+
+You can execute the tests by:
+
+```sh
+python -m unittest discover -s tests
+```
+
+You can generate the coverage report in `htmlcol` (open `index.html`) by:
+
+```sh
+coverage run -m unittest discover -s tests
+coverage html
+```
+
+You can generate the documentation in `html` (open `brfast/index.html`) by:
+
+```sh
+pdoc --html brfast
 ```
 
 
@@ -101,34 +125,23 @@ python -m example_basic.main
 
 Below, we describe the content of each module of this project.
 
-### example_basic
+### assets
 
-`example_basic` contains an example of execution of the FPSelect algorithm.
+The `assets` directory contains assets related to BrFAST.
+- `architecture.md` describes the architecture of the `brfast` module.
+- `gui` contains the design of the graphical user interface, see the
+  `readme.md` of this directory for more information.  
 
-- `main.py` is the executable script to run the simple example.
-  * `MySensitivity` is a simple sensitivity function used for this example.
-  * `MyCost` is a simple usability cost function used for this example.
+### brfast
 
-### fpselect
-
-`fpselect` contains the implementation of the FPSelect algorithm and the
-interfaces.
-
-- `algorithm.py` contains the `FPSelect` class that implements the FPSelect
-  algorithm.
-- `attribute.py` contains the `Attribute` interface that represents the
-  attributes.
-- `cost.py` contains the interfaces that represent the usability cost of an
-  attribute set.
-  * `Cost` is the representation of the usability cost.
-  * `CostFunction` is the interface of the usability cost measure.
-- `sensitivity.py` contains the `SensitivityFunction` interface for the
-  sensitivity measure.
-
-### gui
-
-`gui` contains the design files of the graphical user interfaces used in BrFAST.
-You can refer to the readme in this directory for more information.
+The `brfast` directory contains the BrFAST module written in Python3.
+- `exploration` contains the interfaces and the implementations of the
+  exploration algorithms.
+- `measures` contains the interfaces and the implementations of the different
+  measures used by BrFAST.
+- `utils` contains utility functions used by BrFAST.
+- `data.py` contains the interfaces and the implementations related to the data
+  types manipulated by BrFAST.
 
 
 ## Roadmap
@@ -137,11 +150,11 @@ The attribute selection tool is under development on a private repository. This
 one is a public mirror that will include the features when they are ready. The
 features to come are listed below.
 
-- [ ] Implementation of a sensitivity measure by the proportion of the users
+- [x] Implementation of a sensitivity measure by the proportion of the users
   that share the most common fingerprints.
-- [ ] Implementation of a usability cost measure that captures the size and
+- [x] Implementation of a usability cost measure that captures the size and
   the instability of the generated fingerprints.
-- [ ] Implementation of the usual attribute selection methods that rely on the
+- [x] Implementation of the usual attribute selection methods that rely on the
   entropy and the conditional entropy.
 - [ ] Inclusion of the resources necessary to use the publicly available
   fingerprint datasets of
