@@ -153,6 +153,21 @@ class TestEntropy(unittest.TestCase):
         del comparison_dict[TraceData.RESULT][TraceData.START_TIME]
         del saved_trace_dict[TraceData.RESULT][TraceData.START_TIME]
 
+        # Check and then remove the dataset information which contains its path
+        # that includes the path of the dataset (which is its file in fact)
+        comparison_dataset_info = comparison_dict[TraceData.PARAMETERS][
+            ExplorationParameters.DATASET]
+        # NOTE The comparison dict that is read is given as a file and contains
+        #      the path of my own laptop. No need to verify it.
+        # self.assertEqual(comparison_dataset_info, str(self._dataset))
+        del comparison_dict[TraceData.PARAMETERS][
+            ExplorationParameters.DATASET]
+        saved_trace_dataset_info = saved_trace_dict[TraceData.PARAMETERS][
+                ExplorationParameters.DATASET]
+        self.assertEqual(saved_trace_dataset_info, str(self._dataset))
+        del saved_trace_dict[TraceData.PARAMETERS][
+            ExplorationParameters.DATASET]
+
         # Remove the computation time of each explored attribute set also
         for explored_attr_set_info in comparison_dict[TraceData.EXPLORATION]:
             del explored_attr_set_info[TraceData.TIME]
