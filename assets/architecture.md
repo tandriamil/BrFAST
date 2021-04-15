@@ -70,11 +70,11 @@ package brfast {
 
     package brfast.measures.usability_cost.fpselect {
       class MemoryInstability {
-        + init(size: Dict[int, float], instability: Dict[int, float], weights: Dict[str, float])
+        + init(size: Dict[Attribute, float], instability: Dict[Attribute, float], weights: Dict[str, float])
       }
 
       class MemoryInstabilityTime {
-        + init(size: Dict[int, float], instability: Dict[int, float], time: Dict[int, Tuple[float, bool]], weights: Dict[str, float])
+        + init(size: Dict[Attribute, float], instability: Dict[Attribute, float], time: Dict[Attribute, Tuple[float, bool]], weights: Dict[str, float])
       }
 
       UsabilityCostMeasure <|-- MemoryInstability

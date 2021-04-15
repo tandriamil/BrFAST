@@ -1,12 +1,15 @@
 #!/usr/bin/python3
 """Test module of the exploration module of BrFAST."""
 
+import importlib
 import json
 import unittest
 from math import log2
 from os import path, remove
+from pathlib import PurePath
 from typing import Any, Dict
 
+from brfast import ANALYSIS_ENGINES
 from brfast.data import AttributeSet
 from brfast.exploration import (
     Exploration, ExplorationNotRun, ExplorationParameters,
@@ -15,10 +18,14 @@ from brfast.exploration.conditional_entropy import (
     _get_best_conditional_entropic_attribute, ConditionalEntropy)
 from brfast.measures import UsabilityCostMeasure, SensitivityMeasure
 
-from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        DummyFingerprintDataset)
-from tests.exploration import SENSITIVITY_THRESHOLD, TRACE_FILENAME
+from tests.data import ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset
+from tests.exploration import (SENSITIVITY_THRESHOLD, TRACE_FILENAME,
+                               MODIN_ANALYSIS_ENGINES)
 from tests.measures import DummySensitivity, DummyUsabilityCostMeasure
+
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+pd = importlib.import_module(config['DataAnalysis']['engine'])
 
 EXPECTED_TRACE_PATH = 'assets/expected_trace_conditional_entropy.json'
 
@@ -27,8 +34,7 @@ class TestGetBestConditionalEntropicAttribute(unittest.TestCase):
 
     def setUp(self):
         self._attribute_set = AttributeSet(ATTRIBUTES)
-        self._dataset_path = path.abspath(__file__)
-        self._dataset = DummyCleanDataset(self._dataset_path)
+        self._dataset = DummyCleanDataset()
 
     def test_get_best_entropic_attribute(self):
         # The order is 1 (unique values), then 0 (some collisions), then
@@ -68,7 +74,7 @@ class TestGetBestConditionalEntropicAttribute(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_get_best_entropic_attribute_empty_dataset(self):
-        empty_dataset = DummyEmptyDataset(self._dataset_path)
+        empty_dataset = DummyEmptyDataset()
         with self.assertRaises(KeyError):  # Missing attribute
             _get_best_conditional_entropic_attribute(
                 empty_dataset,
@@ -77,7 +83,7 @@ class TestGetBestConditionalEntropicAttribute(unittest.TestCase):
                 candidate_attributes=self._attribute_set)
 
     def test_get_best_entropic_attribute_empty_attribute_set_and_dataset(self):
-        empty_dataset = DummyEmptyDataset(self._dataset_path)
+        empty_dataset = DummyEmptyDataset()
         with self.assertRaises(KeyError):  # Missing attribute
             _get_best_conditional_entropic_attribute(
                 empty_dataset,
@@ -89,8 +95,7 @@ class TestGetBestConditionalEntropicAttribute(unittest.TestCase):
 class TestConditionalEntropy(unittest.TestCase):
 
     def setUp(self):
-        self._dataset_path = path.abspath(__file__)  # Needed to exist
-        self._dataset = DummyCleanDataset(self._dataset_path)
+        self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()
         self._usability_cost_measure = DummyUsabilityCostMeasure()
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
@@ -106,6 +111,10 @@ class TestConditionalEntropy(unittest.TestCase):
         exploration = ConditionalEntropy(
             self._sensitivity_measure, self._usability_cost_measure,
             self._dataset, self._sensitivity_threshold)
+        expected_analysis_engine = config['DataAnalysis']['engine']
+        if expected_analysis_engine == 'modin.pandas':
+            expected_analysis_engine += (
+                f"[{config['DataAnalysis']['modin_engine']}]")
         expected_parameters = {
             ExplorationParameters.METHOD: exploration.__class__.__name__,
             ExplorationParameters.SENSITIVITY_MEASURE: str(
@@ -114,7 +123,8 @@ class TestConditionalEntropy(unittest.TestCase):
                 self._usability_cost_measure),
             ExplorationParameters.DATASET: str(self._dataset),
             ExplorationParameters.SENSITIVITY_THRESHOLD: (
-                self._sensitivity_threshold)
+                self._sensitivity_threshold),
+            ExplorationParameters.ANALYSIS_ENGINE: expected_analysis_engine
         }
         self.assertDictEqual(exploration.parameters, expected_parameters)
         with self.assertRaises(AttributeError):
@@ -167,8 +177,8 @@ class TestConditionalEntropy(unittest.TestCase):
         exploration.save_exploration_trace(self._trace_path)
 
         # Load the comparison file as a json dictionary
-        tests_module_path = '/'.join(self._dataset_path.split('/')[:-2])
-        comparison_trace_path = f'{tests_module_path}/{EXPECTED_TRACE_PATH}'
+        tests_module_path = PurePath(path.abspath(__file__)).parents[1]
+        comparison_trace_path = tests_module_path.joinpath(EXPECTED_TRACE_PATH)
         with open(comparison_trace_path, 'r') as comparison_file:
             comparison_dict = json.load(comparison_file)
 
@@ -194,6 +204,16 @@ class TestConditionalEntropy(unittest.TestCase):
         self.assertEqual(saved_trace_dataset_info, str(self._dataset))
         del saved_trace_dict[TraceData.PARAMETERS][
             ExplorationParameters.DATASET]
+
+        # Check the analysis engine
+        saved_analysis_engine = saved_trace_dict[TraceData.PARAMETERS][
+            ExplorationParameters.ANALYSIS_ENGINE]
+        expected_analysis_engines = ANALYSIS_ENGINES + MODIN_ANALYSIS_ENGINES
+        self.assertIn(saved_analysis_engine, expected_analysis_engines)
+        del saved_trace_dict[TraceData.PARAMETERS][
+            ExplorationParameters.ANALYSIS_ENGINE]
+        del comparison_dict[TraceData.PARAMETERS][
+            ExplorationParameters.ANALYSIS_ENGINE]
 
         # Remove the computation time of each explored attribute set also
         for explored_attr_set_info in comparison_dict[TraceData.EXPLORATION]:

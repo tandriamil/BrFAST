@@ -1,25 +1,31 @@
 #!/usr/bin/python3
 """Test module of the exploration module of BrFAST."""
 
+import importlib
 import json
 import unittest
 from typing import Any, Dict
+from pathlib import PurePath
 from os import path, remove
 
-import pandas as pd
 from sortedcontainers import SortedDict
 
-from brfast.data import (Attribute, AttributeSet, FingerprintDataset,
-                         MetadataField)
+from brfast import ANALYSIS_ENGINES
+from brfast.data import AttributeSet
 from brfast.exploration import (
     Exploration, ExplorationNotRun, ExplorationParameters,
     SensitivityThresholdUnreachable, State, TraceData)
 
 from tests.data import ATTRIBUTES, DummyFingerprintDataset
 from tests.exploration import (DUMMY_PARAMETER_FIELD, DummyExploration,
-                               SENSITIVITY_THRESHOLD, TRACE_FILENAME)
+                               SENSITIVITY_THRESHOLD, TRACE_FILENAME,
+                               MODIN_ANALYSIS_ENGINES)
 from tests.measures import (DummySensitivity, DummyUsabilityCostMeasure,
                             SENSITIVITIES, TOTAL_COST_FIELD, USABILITIES)
+
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+pd = importlib.import_module(config['DataAnalysis']['engine'])
 
 EXPECTED_TRACE_PATH = 'assets/expected_trace_dummy_exploration.json'
 
@@ -27,8 +33,7 @@ EXPECTED_TRACE_PATH = 'assets/expected_trace_dummy_exploration.json'
 class TestExploration(unittest.TestCase):
 
     def setUp(self):
-        self._dataset_path = path.abspath(__file__)  # Needed to exist
-        self._dataset = DummyFingerprintDataset(self._dataset_path)
+        self._dataset = DummyFingerprintDataset()
         self._sensitivity_measure = DummySensitivity()
         self._usability_cost_measure = DummyUsabilityCostMeasure()
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
@@ -44,6 +49,10 @@ class TestExploration(unittest.TestCase):
         exploration = Exploration(
             self._sensitivity_measure, self._usability_cost_measure,
             self._dataset, self._sensitivity_threshold)
+        expected_analysis_engine = config['DataAnalysis']['engine']
+        if expected_analysis_engine == 'modin.pandas':
+            expected_analysis_engine += (
+                f"[{config['DataAnalysis']['modin_engine']}]")
         expected_parameters = {
             ExplorationParameters.METHOD: exploration.__class__.__name__,
             ExplorationParameters.SENSITIVITY_MEASURE: str(
@@ -52,7 +61,8 @@ class TestExploration(unittest.TestCase):
                 self._usability_cost_measure),
             ExplorationParameters.DATASET: str(self._dataset),
             ExplorationParameters.SENSITIVITY_THRESHOLD: (
-                self._sensitivity_threshold)
+                self._sensitivity_threshold),
+            ExplorationParameters.ANALYSIS_ENGINE: expected_analysis_engine
         }
         self.assertDictEqual(exploration.parameters, expected_parameters)
         with self.assertRaises(NotImplementedError):
@@ -63,6 +73,10 @@ class TestExploration(unittest.TestCase):
         exploration = DummyExploration(
             self._sensitivity_measure, self._usability_cost_measure,
             self._dataset, self._sensitivity_threshold)
+        expected_analysis_engine = config['DataAnalysis']['engine']
+        if expected_analysis_engine == 'modin.pandas':
+            expected_analysis_engine += (
+                f"[{config['DataAnalysis']['modin_engine']}]")
         expected_parameters = {
             ExplorationParameters.METHOD: exploration.__class__.__name__,
             ExplorationParameters.SENSITIVITY_MEASURE: str(
@@ -72,7 +86,8 @@ class TestExploration(unittest.TestCase):
             ExplorationParameters.DATASET: str(self._dataset),
             ExplorationParameters.SENSITIVITY_THRESHOLD: (
                 self._sensitivity_threshold),
-            DUMMY_PARAMETER_FIELD: 42
+            DUMMY_PARAMETER_FIELD: 42,
+            ExplorationParameters.ANALYSIS_ENGINE: expected_analysis_engine
         }
         self.assertDictEqual(exploration.parameters, expected_parameters)
         with self.assertRaises(AttributeError):
@@ -126,8 +141,8 @@ class TestExploration(unittest.TestCase):
         exploration.save_exploration_trace(self._trace_path)
 
         # Load the comparison file as a json dictionary
-        tests_module_path = '/'.join(self._dataset_path.split('/')[:-2])
-        comparison_trace_path = f'{tests_module_path}/{EXPECTED_TRACE_PATH}'
+        tests_module_path = PurePath(path.abspath(__file__)).parents[1]
+        comparison_trace_path = tests_module_path.joinpath(EXPECTED_TRACE_PATH)
         with open(comparison_trace_path, 'r') as comparison_file:
             comparison_dict = json.load(comparison_file)
 
@@ -153,6 +168,16 @@ class TestExploration(unittest.TestCase):
         self.assertEqual(saved_trace_dataset_info, str(self._dataset))
         del saved_trace_dict[TraceData.PARAMETERS][
             ExplorationParameters.DATASET]
+
+        # Check the analysis engine
+        saved_analysis_engine = saved_trace_dict[TraceData.PARAMETERS][
+            ExplorationParameters.ANALYSIS_ENGINE]
+        expected_analysis_engines = ANALYSIS_ENGINES + MODIN_ANALYSIS_ENGINES
+        self.assertIn(saved_analysis_engine, expected_analysis_engines)
+        del saved_trace_dict[TraceData.PARAMETERS][
+            ExplorationParameters.ANALYSIS_ENGINE]
+        del comparison_dict[TraceData.PARAMETERS][
+            ExplorationParameters.ANALYSIS_ENGINE]
 
         # Remove the computation time of each explored attribute set also
         for explored_attr_set_info in comparison_dict[TraceData.EXPLORATION]:

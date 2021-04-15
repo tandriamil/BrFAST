@@ -3,8 +3,7 @@
 
 from typing import Any, Dict
 
-from brfast.data import (Attribute, AttributeSet, FingerprintDataset,
-                         MetadataField)
+from brfast.data import AttributeSet
 from brfast.exploration import (
     Exploration, ExplorationNotRun, ExplorationParameters,
     SensitivityThresholdUnreachable, State, TraceData)
@@ -15,6 +14,7 @@ from tests.measures import SENSITIVITIES, TOTAL_COST_FIELD, USABILITIES
 DUMMY_PARAMETER_FIELD = 'dummy_parameter'
 SENSITIVITY_THRESHOLD = 0.15
 TRACE_FILENAME = 'tested_trace.json'
+MODIN_ANALYSIS_ENGINES = ['modin.pandas[dask]', 'modin.pandas[ray]']
 
 
 class DummyExploration(Exploration):
@@ -99,14 +99,6 @@ class DummyExploration(Exploration):
 
     @property
     def parameters(self) -> Dict[str, Any]:
-        return {
-            ExplorationParameters.METHOD: self.__class__.__name__,
-            ExplorationParameters.SENSITIVITY_MEASURE: str(self._sensitivity),
-            ExplorationParameters.USABILITY_COST_MEASURE: str(
-                self._usability_cost),
-            ExplorationParameters.DATASET: str(
-                self._dataset),
-            ExplorationParameters.SENSITIVITY_THRESHOLD: (
-                self._sensitivity_threshold),
-            DUMMY_PARAMETER_FIELD: 42
-        }
+        default_parameters = self._default_parameters()
+        default_parameters[DUMMY_PARAMETER_FIELD] = 42
+        return default_parameters

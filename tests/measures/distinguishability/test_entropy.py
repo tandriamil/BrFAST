@@ -3,7 +3,6 @@
 
 import unittest
 from math import log2
-from os import path
 
 from brfast.data import Attribute, AttributeSet
 from brfast.measures.distinguishability.entropy import attribute_set_entropy
@@ -14,10 +13,10 @@ from tests.data import ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset
 class TestAttributeSetEntropy(unittest.TestCase):
 
     def setUp(self):
-        self._dummy_dataset = DummyCleanDataset(path.abspath(__file__))
+        self._dummy_dataset = DummyCleanDataset()
 
     def test_empty_dataset(self):
-        empty_dataset = DummyEmptyDataset(path.abspath(__file__))
+        empty_dataset = DummyEmptyDataset()
         attribute_set = AttributeSet()
         self.assertEqual(0.0,
                          attribute_set_entropy(empty_dataset, attribute_set))

@@ -1,11 +1,16 @@
 #!/usr/bin/python3
 """Module containing the interfaces related to the fingerprint dataset."""
 
+import importlib
+from io import TextIOWrapper
 from os import path
 from typing import Iterable, List, Optional
 
-import pandas as pd
 from sortedcontainers import SortedDict
+
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+pd = importlib.import_module(config['DataAnalysis']['engine'])
 
 
 class MetadataField:
@@ -232,24 +237,13 @@ class AttributeSet:
 
 
 class FingerprintDataset:
-    """The FingerprintDataset represents a fingerprint dataset."""
+    """A fingerprint dataset (abstract class)."""
 
-    def __init__(self, dataset_path: str):
-        """Initialize the FingerprintDataset with the path to the dataset.
-
-        Args:
-            dataset_path: The path to the fingerprint dataset.
-
-        Raises:
-            FileNotFoundError: There is not file at the given dataset path.
-        """
-        if not path.isfile(dataset_path):
-            raise FileNotFoundError(f'The dataset file at {dataset_path} is '
-                                    'not found.')
-        self._dataset_path = dataset_path
+    def __init__(self):
+        """Initialize."""
         self._dataframe, self._candidate_attributes = None, None
 
-        # Process the dataset from the input file
+        # Process the dataset
         self._process_dataset()
 
         # Check that the necessary metadatas are present
@@ -269,47 +263,103 @@ class FingerprintDataset:
         Returns:
             A string representation of this fingerprint dataset.
         """
-        return f'{self.__class__.__name__}({self._dataset_path})'
+        return f'{self.__class__.__name__}'
 
     def _process_dataset(self):
-        """Process the dataset to obtain a pandas DataFrame from the file.
+        """Process the dataset to obtain a DataFrame from the file.
 
         - The resulting fingerprint dataset is stored in self._dataframe.
-        - The fingerprint dataset has to be a pandas DataFrame with the two
+        - The fingerprint dataset has to be a DataFrame with the two
           indices being  browser_id (int64) and time_of_collect (datetime64).
         - The columns are named after the attributes and have the value
           collected for the browser browser_id at the time time_of_collect.
         - The name of each column should correspond to the attribute.name
           property of an attribute of the candidate attributes.
 
-        The default behavior is to generate a DataFrame from the csv stored at
-        self._dataset_path with the two indices set.
+        Raises:
+            NotImplementedError: This abstract method is not defined.
         """
-        self._dataframe = pd.read_csv(self._dataset_path,
-                                      index_col=[MetadataField.BROWSER_ID,
-                                                 MetadataField.TIME_OF_COLLECT]
-                                      )
+        raise NotImplementedError
 
     def _set_candidate_attributes(self):
         """Set the candidate attributes.
 
-        The default behavior is to generate the candidate attributes from the
-        columns of the DataFrame, ignoring the browser_id and time_of_collect
-        fields.
+        Raises:
+            NotImplementedError: This abstract method is not defined.
+        """
+        raise NotImplementedError
+
+    @property
+    def dataframe(self) -> pd.DataFrame:
+        """Give the fingerprint dataset as a DataFrame.
+
+        Returns:
+            The fingerprint dataset as a DataFrame.
+        """
+        return self._dataframe
+
+    @property
+    def candidate_attributes(self) -> AttributeSet:
+        """Give the candidate attributes as an AttributeSet.
+
+        Returns:
+            The candidate attributes as an AttributeSet.
+        """
+        return self._candidate_attributes
+
+
+class FingerprintDatasetFromFile(FingerprintDataset):
+    """A fingerprint dataset read from a file."""
+
+    def __init__(self, dataset_path: str):
+        """Initialize the FingerprintDataset with the path to the dataset.
+
+        Args:
+            dataset_path: The path to the fingerprint dataset.
+
+        Raises:
+            FileNotFoundError: There is not file at the given dataset path.
+        """
+        if not path.isfile(dataset_path):
+            raise FileNotFoundError(f'The dataset file at {dataset_path} is '
+                                    'not found.')
+        self._dataset_path = dataset_path
+        super().__init__()
+
+    def __repr__(self) -> str:
+        """Provide a string representation of this fingerprint dataset.
+
+        Returns:
+            A string representation of this fingerprint dataset.
+        """
+        return f'{self.__class__.__name__}({self._dataset_path})'
+
+    def _process_dataset(self):
+        """Process the dataset to obtain a DataFrame from the file.
+
+        - The resulting fingerprint dataset is stored in self._dataframe.
+        - The fingerprint dataset has to be a DataFrame with the two
+          indices being  browser_id (int64) and time_of_collect (datetime64).
+        - The columns are named after the attributes and have the value
+          collected for the browser browser_id at the time time_of_collect.
+        - The name of each column should correspond to the attribute.name
+          property of an attribute of the candidate attributes.
+
+        Raises:
+            NotImplementedError: This abstract method is not defined.
+        """
+        raise NotImplementedError
+
+    def _set_candidate_attributes(self):
+        """Set the candidate attributes.
+
+        This implementation generates the candidate attributes from the columns
+        of the DataFrame, ignoring the browser_id and time_of_collect fields.
         """
         self._candidate_attributes = AttributeSet()
         for column_id, column in enumerate(self._dataframe.columns, 1):
             attribute = Attribute(column_id, column)
             self._candidate_attributes.add(attribute)
-
-    @property
-    def dataframe(self) -> pd.DataFrame:
-        """Give the fingerprint dataset as a pandas DataFrame.
-
-        Returns:
-            The fingerprint dataset as a pandas DataFrame.
-        """
-        return self._dataframe
 
     @property
     def dataset_path(self) -> str:
@@ -320,11 +370,78 @@ class FingerprintDataset:
         """
         return self._dataset_path
 
-    @property
-    def candidate_attributes(self) -> AttributeSet:
-        """Give the candidate attributes as an AttributeSet.
 
-        Returns:
-            The candidate attributes as an AttributeSet.
+class FingerprintDatasetFromCSVFile(FingerprintDatasetFromFile):
+    """A fingerprint dataset read from a csv file."""
+
+    def _process_dataset(self):
+        """Process the dataset to obtain a DataFrame from the file.
+
+        - The resulting fingerprint dataset is stored in self._dataframe.
+        - The fingerprint dataset has to be a DataFrame with the two
+          indices being  browser_id (int64) and time_of_collect (datetime64).
+        - The columns are named after the attributes and have the value
+          collected for the browser browser_id at the time time_of_collect.
+        - The name of each column should correspond to the attribute.name
+          property of an attribute of the candidate attributes.
+
+        This implementation generates a DataFrame from the csv stored at
+        self._dataset_path with the two indices set.
         """
-        return self._candidate_attributes
+        # Read the file from a csv
+        # + Parse the 'time_of_collect' column as a date with the option
+        #   infer_datetime_format activated for performances
+        self._dataframe = pd.read_csv(self._dataset_path, index_col=False)
+
+        # Set the indices as 'browser_id' and 'time_of_collect'
+        self._dataframe.set_index(
+            [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
+            inplace=True)
+
+
+class FingerprintDatasetFromCSVInMemory(FingerprintDataset):
+    """A fingerprint dataset read from a in memory csv file."""
+
+    def __init__(self, file_handle: TextIOWrapper):
+        """Initialize with the file handle of the in memory csv file.
+
+        Args:
+            file_handle: The file handle of the in memory csv file.
+        """
+        self._file_handle = file_handle
+        super().__init__()
+
+    def _process_dataset(self):
+        """Process the dataset to obtain a DataFrame from the file.
+
+        - The resulting fingerprint dataset is stored in self._dataframe.
+        - The fingerprint dataset has to be a DataFrame with the two
+          indices being  browser_id (int64) and time_of_collect (datetime64).
+        - The columns are named after the attributes and have the value
+          collected for the browser browser_id at the time time_of_collect.
+        - The name of each column should correspond to the attribute.name
+          property of an attribute of the candidate attributes.
+
+        This implementation generates a DataFrame from the csv stored in memory
+        with the two indices set.
+        """
+        # Read the file from the in memory csv file
+        # + Parse the 'time_of_collect' column as a date with the option
+        #   infer_datetime_format activated for performances
+        self._dataframe = pd.read_csv(self._file_handle, index_col=False)
+
+        # Set the indices as 'browser_id' and 'time_of_collect'
+        self._dataframe.set_index(
+            [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
+            inplace=True)
+
+    def _set_candidate_attributes(self):
+        """Set the candidate attributes.
+
+        This implementation generates the candidate attributes from the columns
+        of the DataFrame, ignoring the browser_id and time_of_collect fields.
+        """
+        self._candidate_attributes = AttributeSet()
+        for column_id, column in enumerate(self._dataframe.columns, 1):
+            attribute = Attribute(column_id, column)
+            self._candidate_attributes.add(attribute)

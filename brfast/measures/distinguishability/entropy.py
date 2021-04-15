@@ -3,6 +3,7 @@
 
 from scipy.stats import entropy
 
+from brfast import config
 from brfast.data import AttributeSet, FingerprintDataset
 
 
@@ -24,10 +25,15 @@ def attribute_set_entropy(fingerprint_dataset: FingerprintDataset,
     Raises:
         ValueError: The attribute set is empty, no grouping is possible.
         KeyError: An attribute is not in the fingerprint dataset.
+
+    Note:
+        This function is forced to use pandas as the data analysis engine.
     """
-    dataframe = fingerprint_dataset.dataframe
     considered_attribute_names = [attribute.name
                                   for attribute in attribute_set]
+    dataframe = fingerprint_dataset.dataframe
+    if config['DataAnalysis']['engine'] == 'modin.pandas':
+        dataframe = dataframe._to_pandas()
     distinct_value_count = dataframe.value_counts(considered_attribute_names,
                                                   normalize=True, sort=False)
     return entropy(distinct_value_count, base=ENTROPY_BASE)

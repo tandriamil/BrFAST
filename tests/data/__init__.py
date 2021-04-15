@@ -1,10 +1,14 @@
 #!/usr/bin/python3
 """Module containing the implementation of data-related objects for tests."""
 
-import pandas as pd
+import importlib
 
 from brfast.data import (Attribute, AttributeSet, FingerprintDataset,
                          MetadataField)
+
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+pd = importlib.import_module(config['DataAnalysis']['engine'])
 
 ATTRIBUTES = [Attribute(1, 'user_agent'), Attribute(2, 'timezone'),
               Attribute(3, 'do_not_track')]

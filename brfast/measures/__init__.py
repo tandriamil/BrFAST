@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 """Module containing the interfaces of the measure functions."""
 
-from typing import Dict, Tuple
+import csv
+from typing import Any, Dict, List, Tuple
 
-from brfast.data import AttributeSet
+from loguru import logger
+
+from brfast.data import AttributeSet, FingerprintDataset
 
 
 class UsabilityCostMeasure:
@@ -66,3 +69,56 @@ class SensitivityMeasure:
             The sensitivity of the attribute set.
         """
         raise NotImplementedError
+
+
+class Analysis():
+    """An interface to represent an analysis of a fingerprint dataset."""
+
+    def __init__(self, dataset: FingerprintDataset):
+        """Initialize the analysis.
+
+        Args:
+            dataset: The fingerprint dataset to analyze.
+        """
+        self._dataset = dataset
+        self._result = {}
+
+    def execute(self):
+        """Execute the analysis.
+
+        Raises:
+            NotImplementedError: This abstract method is not defined.
+        """
+        raise NotImplementedError
+
+    @property
+    def result(self) -> Dict:
+        """Give the result as a dictionary.
+
+        Returns.
+            The result as a dictionary. Empty if not yet executed.
+        """
+        return self._result
+
+    def _from_dict_to_row_list(self) -> List[List[Any]]:
+        """Give the representation of the csv result as a list of rows.
+
+        Returns:
+            A list of rows, each row being a list of values to store. The first
+            row should contain the headers.
+        """
+        raise NotImplementedError
+
+    def save_csv_result(self, output_path: str):
+        """Save the csv result.
+
+        Args:
+            output_path: The file where to write the csv result.
+        """
+        row_list = self._from_dict_to_row_list()
+        logger.debug(f'Saving {self.__class__.__name__} csv result to '
+                     f'{output_path}.')
+        with open(output_path, 'w+') as csv_output_file:
+            csv_output_writer = csv.writer(csv_output_file)
+            for row in row_list:
+                csv_output_writer.writerow(row)

@@ -1,12 +1,7 @@
 #!/usr/bin/python3
-"""Executable module embarking a simple example.
+"""A dummy exploration using the example of our FPSelect paper."""
 
-This simple example is the one that is displayed in our FPSelect paper.
-"""
-
-from os import path
-
-import pandas as pd
+import importlib
 
 from brfast.data import (Attribute, AttributeSet, FingerprintDataset,
                          MetadataField)
@@ -15,8 +10,61 @@ from brfast.exploration.entropy import Entropy
 from brfast.exploration.fpselect import FPSelect
 from brfast.measures import UsabilityCostMeasure, SensitivityMeasure
 
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+pd = importlib.import_module(config['DataAnalysis']['engine'])
 
-# ----- Definition of the sensitivity and usability cost measure
+
+# The parameters of the three exploration methods that are tested
+SENSITIVITY_THRESHOLD = 0.15  # The threshold of the FPSelect paper example
+EXPLORED_PATHS = 2  # Specific to FPSelect
+PRUNING_ON = True  # Specific to FPSelect
+
+
+def main():
+    """Execute the three exploration methods on the dummy FPSelect example."""
+    sensitivity_measure = DummySensitivityMeasure()
+    usability_cost_measure = DummyUsabilityCostMeasure()
+    dataset = DummyFingerprintDataset()
+
+    # Entropy baseline
+    entropy_exploration = Entropy(sensitivity_measure, usability_cost_measure,
+                                  dataset, SENSITIVITY_THRESHOLD)
+    print('Beginning of the entropy execution...')
+    entropy_exploration.run()
+    entropy_solution = entropy_exploration.get_solution()
+    entropy_explored_attribute_sets = len(
+        entropy_exploration.get_explored_attribute_sets())
+    print(f'The solution found by the entropy baseline is {entropy_solution} '
+          f'after exploring {entropy_explored_attribute_sets} attribute sets.')
+
+    # Conditional entropy baseline
+    cond_ent_exploration = ConditionalEntropy(
+        sensitivity_measure, usability_cost_measure, dataset,
+        SENSITIVITY_THRESHOLD)
+    print('Beginning of the conditional entropy execution...')
+    cond_ent_exploration.run()
+    cond_ent_solution = cond_ent_exploration.get_solution()
+    cond_ent_explored_attribute_sets = len(
+        cond_ent_exploration.get_explored_attribute_sets())
+    print('The solution found by the conditional entropy baseline is '
+          f'{cond_ent_solution} after exploring '
+          f'{cond_ent_explored_attribute_sets} attribute sets.')
+
+    # FPSelect method
+    fpselect_exploration = FPSelect(
+        sensitivity_measure, usability_cost_measure, dataset,
+        SENSITIVITY_THRESHOLD, EXPLORED_PATHS, PRUNING_ON)
+    print('Beginning of the FPSelect execution...')
+    fpselect_exploration.run()
+    fpselect_solution = fpselect_exploration.get_solution()
+    fpselect_explored_attribute_sets = len(
+        fpselect_exploration.get_explored_attribute_sets())
+    print(f'The solution found by FPSelect is {fpselect_solution} after '
+          f'exploring {fpselect_explored_attribute_sets} attribute sets.')
+
+
+# ----- Definition of the dummy sensitivity and usability cost measure
 class DummySensitivityMeasure(SensitivityMeasure):
     """A dummy sensivity measure that returns hard-coded values.
 
@@ -125,47 +173,5 @@ class DummyFingerprintDataset(FingerprintDataset):
             inplace=True)
 
 
-# ----- Actual execution using the three exploration methods
-sensitivity_measure = DummySensitivityMeasure()
-usability_cost_measure = DummyUsabilityCostMeasure()
-# Just need a valid file for the dataset, its content is hard-coded
-dataset = DummyFingerprintDataset(path.abspath(__file__))
-SENSITIVITY_THRESHOLD = 0.15  # The threshold of the FPSelect paper example
-
-# Entropy baseline
-entropy_exploration = Entropy(sensitivity_measure, usability_cost_measure,
-                              dataset, SENSITIVITY_THRESHOLD)
-print('Beginning of the entropy execution...')
-entropy_exploration.run()
-entropy_solution = entropy_exploration.get_solution()
-entropy_explored_attribute_sets = len(
-    entropy_exploration.get_explored_attribute_sets())
-print(f'The solution found by the entropy baseline is {entropy_solution} '
-      f'after exploring {entropy_explored_attribute_sets} attribute sets.')
-
-# Conditional entropy baseline
-cond_ent_exploration = ConditionalEntropy(
-    sensitivity_measure, usability_cost_measure, dataset,
-    SENSITIVITY_THRESHOLD)
-print('Beginning of the conditional entropy execution...')
-cond_ent_exploration.run()
-cond_ent_solution = cond_ent_exploration.get_solution()
-cond_ent_explored_attribute_sets = len(
-    cond_ent_exploration.get_explored_attribute_sets())
-print('The solution found by the conditional entropy baseline is '
-      f'{cond_ent_solution} after exploring '
-      f'{cond_ent_explored_attribute_sets} attribute sets.')
-
-# FPSelect method
-EXPLORED_PATHS = 2
-PRUNING_ON = True
-fpselect_exploration = FPSelect(sensitivity_measure, usability_cost_measure,
-                                dataset, SENSITIVITY_THRESHOLD, EXPLORED_PATHS,
-                                PRUNING_ON)
-print('Beginning of the FPSelect execution...')
-fpselect_exploration.run()
-fpselect_solution = fpselect_exploration.get_solution()
-fpselect_explored_attribute_sets = len(
-    fpselect_exploration.get_explored_attribute_sets())
-print(f'The solution found by FPSelect is {fpselect_solution} after exploring '
-      f'{fpselect_explored_attribute_sets} attribute sets.')
+if __name__ == '__main__':
+    main()

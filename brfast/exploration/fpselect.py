@@ -74,17 +74,12 @@ class FPSelect(Exploration):
         Returns:
             The parameters as a dictionary of their name and their value.
         """
-        return {
-            ExplorationParameters.METHOD: self.__class__.__name__,
-            ExplorationParameters.SENSITIVITY_MEASURE: str(self._sensitivity),
-            ExplorationParameters.USABILITY_COST_MEASURE: str(
-                self._usability_cost),
-            ExplorationParameters.DATASET: str(self._dataset),
-            ExplorationParameters.SENSITIVITY_THRESHOLD: (
-                self._sensitivity_threshold),
+        parameters = self._default_parameters()
+        parameters.update({
             FPSelectParameters.EXPLORED_PATHS: self._explored_paths,
             FPSelectParameters.PRUNING: self._pruning
-        }
+        })
+        return parameters
 
     def _search_for_solution(self):
         """Search for a solution using the FPSelect exploration algorithm.
@@ -166,6 +161,7 @@ class FPSelect(Exploration):
         """
         logger.debug(f'Exploring {attribute_set}:')
         efficiency = None  # None returned if its supersets are to be ignored
+        attribute_set_state = State.EXPLORED
 
         # Compute its sensitivity and its cost
         sensitivity = self._sensitivity.evaluate(attribute_set)
@@ -195,16 +191,14 @@ class FPSelect(Exploration):
             cost_gain = self._max_cost - cost
             efficiency = cost_gain / sensitivity
             attribute_set_state = State.EXPLORED
-            logger.debug('  will explore the supersets of '
-                         f'{attribute_set}.')
+            logger.debug(f'  will explore the supersets of {attribute_set}.')
 
         # For any other cases (threshold not reached, higher cost) when
         # the pruning methods are used, we ignore their supersets
         elif self._pruning:
             self._attr_sets_ignored_supersets.add(attribute_set)
             attribute_set_state = State.PRUNED
-            logger.debug('  will ignore the supersets of: '
-                         f'{attribute_set}.')
+            logger.debug(f'  will ignore the supersets of {attribute_set}.')
 
         # Store this attribute set in the explored sets
         compute_time = str(datetime.now() - self._start_time)

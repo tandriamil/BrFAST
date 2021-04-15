@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}
+  BrFAST - Browser Fingerprinting Attribute Selection Tool
+{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-sm-1 col-md-2 col-lg-3"></div>
+    <div class="col-sm-10 col-md-8 col-lg-6">
+      <h1>Please submit the files</h1>
+
+      <br/>
+
+      <form method="POST" enctype="multipart/form-data" style="text-align: center;">
+        <div class="form-group">
+          <label for="trace-file"><h3>Trace file</h3></label>
+          <input type="file" name="trace-file" class="form-control-file" id="trace-file">
+        </div>
+
+        <br/>
+
+        <div class="form-group">
+          <label for="fingerprint-dataset"><h3>Fingerprint dataset (optional)</h3></label>
+          <input type="file" name="fingerprint-dataset" class="form-control-file" id="fingerprint-dataset">
+        </div>
+
+        <br/>
+
+        <button type="submit" class="btn btn-primary">Send the files</button>
+      </form>
+    </div>
+    <div class="col-sm-1 col-md-2 col-lg-3"></div>
+  </div>
+{% endblock %}

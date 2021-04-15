@@ -1,17 +1,22 @@
 #!/usr/bin/python3
 """Test module of the data module of BrFAST."""
 
+import importlib
 import unittest
 from os import path
+from pathlib import PurePath
 
-import pandas as pd
-
-from brfast.data import (Attribute, AttributeSet, FingerprintDataset,
-                         MetadataField, MissingMetadatasFields)
+from brfast.data import (
+    Attribute, AttributeSet, FingerprintDatasetFromCSVFile, MetadataField,
+    MissingMetadatasFields)
 
 from tests.data import (
     ATTRIBUTES, DummyFingerprintDataset, DummyDatasetMissingBrowserId,
     DummyDatasetMissingTimeOfCollect)
+
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+pd = importlib.import_module(config['DataAnalysis']['engine'])
 
 RELATIVE_PATH_TO_FP_SAMPLE = 'assets/fingerprint-sample.csv'
 
@@ -157,34 +162,29 @@ class TestAttributeSet(unittest.TestCase):
             self._attribute_set.get_attribute_by_name('unknown')
 
 
-class TestFingerprintDataset(unittest.TestCase):
+class TestFingerprintDatasetFromCSVFile(unittest.TestCase):
 
     def setUp(self):
-        self._file_path = path.abspath(__file__)
-        tests_module_path = '/'.join(self._file_path.split('/')[:-2])
-        self._fingerprint_sample_path = '/'.join((tests_module_path,
-                                                  RELATIVE_PATH_TO_FP_SAMPLE))
-        self._unexistent_path = '/unexistent_path/does/not/exist'
+        tests_module_path = PurePath(path.abspath(__file__)).parents[1]
+        self._fingerprint_sample_path = tests_module_path.joinpath(
+            RELATIVE_PATH_TO_FP_SAMPLE)
 
     def test_fingerprint_sample(self):
-        sample_dataset = FingerprintDataset(self._fingerprint_sample_path)
+        sample_dataset = FingerprintDatasetFromCSVFile(
+            self._fingerprint_sample_path)
         self.assertIsInstance(sample_dataset.dataframe, pd.DataFrame)
         self.assertEqual(len(sample_dataset.dataframe), 1)
         self.assertEqual(sample_dataset.candidate_attributes,
                          AttributeSet(ATTRIBUTES))
 
-    def test_unexistent_dataset_file_path(self):
-        with self.assertRaises(FileNotFoundError):
-            DummyFingerprintDataset(self._unexistent_path)
-
     def test_missing_metadatas(self):
         with self.assertRaises(MissingMetadatasFields):
-            DummyDatasetMissingBrowserId(self._file_path)
+            DummyDatasetMissingBrowserId()
         with self.assertRaises(MissingMetadatasFields):
-            DummyDatasetMissingTimeOfCollect(self._file_path)
+            DummyDatasetMissingTimeOfCollect()
 
     def test_dataset_property(self):
-        dummy_fp_dataset = DummyFingerprintDataset(self._file_path)
+        dummy_fp_dataset = DummyFingerprintDataset()
         self.assertIsInstance(dummy_fp_dataset.dataframe, pd.DataFrame)
         self.assertEqual(
             len(dummy_fp_dataset.dataframe),
@@ -193,13 +193,13 @@ class TestFingerprintDataset(unittest.TestCase):
             dummy_fp_dataset.dataframe = pd.DataFrame()
 
     def test_dataset_path_property(self):
-        dummy_fp_dataset = DummyFingerprintDataset(self._file_path)
-        self.assertEqual(dummy_fp_dataset.dataset_path, self._file_path)
-        with self.assertRaises(AttributeError):
-            dummy_fp_dataset.dataset_path = '/forbidden/write'
+        sample_dataset = FingerprintDatasetFromCSVFile(
+            self._fingerprint_sample_path)
+        self.assertEqual(sample_dataset.dataset_path,
+                         self._fingerprint_sample_path)
 
     def test_candidate_attributes_property(self):
-        dummy_fp_dataset = DummyFingerprintDataset(self._file_path)
+        dummy_fp_dataset = DummyFingerprintDataset()
         self.assertEqual(dummy_fp_dataset.candidate_attributes,
                          AttributeSet(ATTRIBUTES))
         with self.assertRaises(AttributeError):

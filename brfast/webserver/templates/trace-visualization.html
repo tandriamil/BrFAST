@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+
+{% block title %}
+  BrFAST - Visualization of a Trace
+{% endblock %}
+
+{% block content %}
+  <!-- Top banner information -->
+  <div class="row">
+    <!-- Parameters -->
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          Parameters
+        </div>
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th scope="col">Parameter</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Selection method</th>
+                <td>{{ parameters['method'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Sensitivity threshold</th>
+                <td>{{ parameters['sensitivity_threshold'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Paths explored</th>
+                <td>3</td>
+              </tr>
+              <tr>
+                <th scope="row">Fingerprint dataset</th>
+                <td>{{ parameters['dataset'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Sensitivity measure</th>
+                <td>{{ parameters['sensitivity_measure'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Usability measure</th>
+                <td>{{ parameters['usability_cost_measure'] }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- End of the parameters information -->
+
+    <!-- Current exploration state -->
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          Exploration state
+        </div>
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th scope="col">Information</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody id="exploration-state-table">
+              <tr>
+                <th scope="row">Explored nodes</th>
+                <td id="explored-nodes">0</td>
+              </tr>
+              <tr>
+                <th scope="row">Best solution id</th>
+                <td><a id="best-solution">...</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Best sensitivity</th>
+                <td id="best-sensitivity">...</td>
+              </tr>
+              <tr>
+                <th scope="row">Best usability cost</th>
+                <td id="best-usability-cost">...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- End of the current exploration state -->
+  </div>
+  <!-- End of the top banner information -->
+
+  <!-- Visualization of the usability gains -->
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          Usability gain compared to the complete attribute set
+        </div>
+        <div class="card-body" id="usability-cost-progress-bars">
+          <div>
+            Usability cost
+            <div class="progress">
+              <div class="progress-bar bg" role="progressbar" id="progress-usability-cost" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">100%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- End of the visualization of the usability gains -->
+
+  <!-- Visualization of the explored lattice -->
+  <div class="row">
+    <div class="col-sm-12">
+      <div class="card">
+        <div class="card-header">
+          Graph visualization
+        </div>
+        <div class="card-body">
+          <svg width="600" height="400" id="graph-container"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- End of the visualization of the explored lattice -->
+{% endblock %}
+
+
+{% block js_libraries %}
+  <!-- D3.js -->
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.6.2/d3.min.js"></script>
+
+  <!-- JS script for the dynamic visualization of the lattice -->
+  <script type="text/javascript" src="{{ url_for('static', filename='dynamic-visualization.js') }}"></script>
+{% endblock %}

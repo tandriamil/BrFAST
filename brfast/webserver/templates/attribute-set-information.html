@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+
+{% block title %}
+  BrFAST - Attribute Set {{ attribute_set_infos['id'] }}
+{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <!-- Fingerprint sample only if a fingerprint dataset is set -->
+    {% if fingerprint_sample %}
+      <div class="col">
+        <div class="card">
+          <div class="card-header">
+            Fingerprint sample
+          </div>
+          <div class="card-body" style="overflow-x: auto;">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th scope="col">Row</th>
+                  {% for attribute_name in attribute_names %}
+                    <th scope="col">{{ attribute_name }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row_id, fingerprint in fingerprint_sample.items() %}
+                <tr>
+                  <th scope="row">{{ row_id }}</th>
+                  {% for attribute_value in fingerprint %}
+                    <td>{{ attribute_value }}</td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    <!-- End of the fingerprint sample only if a fingerprint dataset is set -->
+
+    {% else %}
+    <!-- Attribute names if no fingerprint dataset is set -->
+      <div class="col">
+        <div class="card">
+          <div class="card-header">
+            Attributes
+          </div>
+          <div class="card-body">
+            {{ ', '.join(attribute_names) }}
+          </div>
+        </div>
+      </div>
+    <!-- End of attribute names if no fingerprint dataset is set -->
+    {% endif %}
+
+    <!-- Visualization of the usability gains -->
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          Usability gain compared to the complete attribute set
+        </div>
+        <div class="card-body">
+          {% for (cost_dimension, (progress_bar_class, cost_percentage)) in usability_cost_ratio.items() %}
+          <div>
+            {{ cost_dimension.capitalize() }} cost
+            <div class="progress">
+              <div class="progress-bar bg{{ progress_bar_class }}" role="progressbar" style="width: {{ cost_percentage }}%" aria-valuenow="{{ cost_percentage }}" aria-valuemin="0" aria-valuemax="100">{{ cost_percentage }}%</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <!-- End of the visualization of the usability gains -->
+
+    <!-- Attribute set information -->
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          Attribute set information
+        </div>
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th scope="col">Information</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Id</th>
+                <td>{{ attribute_set_infos['id'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">State</th>
+                <td>{{ attribute_set_state }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Time</th>
+                <td>{{ attribute_set_infos['time'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Sensitivity</th>
+                <td>{{ '%.3f' % attribute_set_infos['sensitivity'] }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Usability cost</th>
+                <td>{{ '%.3f' % attribute_set_infos['usability_cost'] }}</td>
+              </tr>
+              {% for cost_dimension, cost_value in attribute_set_infos['cost_explanation'].items() %}
+                <tr>
+                  <th scope="row">{{ cost_dimension.replace('_', ' ').capitalize() }} cost</th>
+                  <td>{{ '%.3f' % cost_value }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- End of the attribute set information -->
+{% endblock %}

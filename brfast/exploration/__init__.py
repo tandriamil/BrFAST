@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Set
 from loguru import logger
 from sortedcontainers import SortedDict, SortedList
 
+from brfast import config
 from brfast.measures import SensitivityMeasure, UsabilityCostMeasure
 from brfast.data import AttributeSet, FingerprintDataset
 
@@ -19,6 +20,7 @@ class State(IntEnum):
     EXPLORED = 1
     PRUNED = 2
     SATISFYING = 3
+    EMPTY_NODE = 4
 
 
 class TraceData:
@@ -50,6 +52,7 @@ class ExplorationParameters:
     SENSITIVITY_MEASURE = 'sensitivity_measure'
     SENSITIVITY_THRESHOLD = 'sensitivity_threshold'
     USABILITY_COST_MEASURE = 'usability_cost_measure'
+    ANALYSIS_ENGINE = 'analysis_engine'
 
 
 class ExplorationNotRun(Exception):
@@ -222,13 +225,15 @@ class Exploration:
         # Return whether the minimum sensitivity satisfies the threshold
         return min_sensitivity_satisfies_threshold
 
-    @property
-    def parameters(self) -> Dict[str, Any]:
-        """Give the parameters of the exploration as a dictionary.
+    def _default_parameters(self) -> Dict[str, Any]:
+        """Give the parameters that are always present in an exploration.
 
         Returns:
-            The parameters as a dictionary of their name and their value.
+            A dictionary with the default parameters of an exploration.
         """
+        analysis_engine = config['DataAnalysis']['engine']
+        if analysis_engine == 'modin.pandas':
+            analysis_engine += f"[{config['DataAnalysis']['modin_engine']}]"
         return {
             ExplorationParameters.METHOD: self.__class__.__name__,
             ExplorationParameters.SENSITIVITY_MEASURE: str(self._sensitivity),
@@ -236,8 +241,18 @@ class Exploration:
                 self._usability_cost),
             ExplorationParameters.DATASET: str(self._dataset),
             ExplorationParameters.SENSITIVITY_THRESHOLD: (
-                self._sensitivity_threshold)
+                self._sensitivity_threshold),
+            ExplorationParameters.ANALYSIS_ENGINE: analysis_engine
         }
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        """Give the parameters of the exploration as a dictionary.
+
+        Returns:
+            The parameters as a dictionary of their name and their value.
+        """
+        return self._default_parameters()
 
     def get_solution(self) -> AttributeSet:
         """Provide the solution found by the algorithm after the exploration.

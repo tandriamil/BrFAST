@@ -1,0 +1,9 @@
+[DataAnalysis]
+
+; The data analysis engine
+; Choices: pandas, modin.pandas
+engine = pandas
+
+; The modin engine, used when the selected data analysis engine is modin.pandas
+; Choices: dask, ray
+modin_engine = ray

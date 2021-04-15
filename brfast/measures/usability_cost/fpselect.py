@@ -3,7 +3,7 @@
 
 from typing import Dict, Tuple
 
-from brfast.data import AttributeSet
+from brfast.data import Attribute, AttributeSet
 from brfast.measures import UsabilityCostMeasure
 
 
@@ -29,8 +29,9 @@ class MemoryInstability(UsabilityCostMeasure):
 
     _expected_dimensions = {CostDimension.MEMORY, CostDimension.INSTABILITY}
 
-    def __init__(self, size: Dict[int, float], instability: Dict[int, float],
-                 weights: Dict[str, float]):
+    def __init__(self, size: Dict[Attribute, float],
+                 instability: Dict[Attribute, float],
+                 weights: Dict[Attribute, float]):
         """Initialize the cost measure that considers memory and instability.
 
         Args:
@@ -99,9 +100,9 @@ class MemoryInstability(UsabilityCostMeasure):
         Returns:
             A tuple of the memory cost and the weighted memory cost.
         """
-        memory_cost = sum(self._size[attribute.attr_id]
-                          for attribute in attribute_set)
-        weighted_memory_cost = memory_cost * self._weights[CostDimension.MEMORY]
+        memory_cost = sum(self._size[attribute] for attribute in attribute_set)
+        weighted_memory_cost = (memory_cost
+                                * self._weights[CostDimension.MEMORY])
         return (memory_cost, weighted_memory_cost)
 
     def _compute_instability_cost(self, attribute_set: AttributeSet
@@ -114,7 +115,7 @@ class MemoryInstability(UsabilityCostMeasure):
         Returns:
             A tuple of the instability cost and the weighted instability cost.
         """
-        instability_cost = sum(self._instability[attribute.attr_id]
+        instability_cost = sum(self._instability[attribute]
                                for attribute in attribute_set)
         weighted_instability_cost = (
             instability_cost * self._weights[CostDimension.INSTABILITY])
@@ -130,9 +131,10 @@ class MemoryInstabilityTime(MemoryInstability):
     _expected_dimensions = {CostDimension.MEMORY, CostDimension.INSTABILITY,
                             CostDimension.TIME}
 
-    def __init__(self, size: Dict[int, float], instability: Dict[int, float],
-                 time: Dict[int, Tuple[float, bool]],
-                 weights: Dict[str, float]):
+    def __init__(self, size: Dict[Attribute, float],
+                 instability: Dict[Attribute, float],
+                 time: Dict[Attribute, Tuple[float, bool]],
+                 weights: Dict[Attribute, float]):
         """Initialize the cost measure (memory, instability, and col. time).
 
         Args:
@@ -193,7 +195,7 @@ class MemoryInstabilityTime(MemoryInstability):
         sequential_attrs_col_time = 0.0  # The col. time of the sequential att.
         max_asynchronous_col_time = 0.0  # The col. time of the longest async.
         for attribute in attribute_set:
-            av_col_time, is_asynchronous = self._time[attribute.attr_id]
+            av_col_time, is_asynchronous = self._time[attribute]
             if is_asynchronous:
                 if av_col_time > max_asynchronous_col_time:
                     max_asynchronous_col_time = av_col_time

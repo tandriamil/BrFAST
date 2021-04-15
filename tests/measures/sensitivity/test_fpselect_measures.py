@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 """Test module of the brfast.measures.sensitivity.fp_select_measures module."""
 
+import importlib
 import unittest
-from os import path
 
 import pandas as pd
 from pandas.testing import assert_frame_equal  # To test DataFrame objects
@@ -13,11 +13,14 @@ from brfast.measures.sensitivity.fpselect import (
 
 from tests.data import ATTRIBUTES, DummyCleanDataset, DummyFingerprintDataset
 
+# Import the engine of the analysis module (pandas or modin)
+from brfast import config
+
 
 class TestGetTopKFingerprints(unittest.TestCase):
 
     def setUp(self):
-        self._dataset = DummyCleanDataset(path.abspath(__file__))
+        self._dataset = DummyCleanDataset()
         self._attribute_names = [attribute.name for attribute in ATTRIBUTES]
 
     def test_top_0_fingerprints(self):
@@ -26,14 +29,12 @@ class TestGetTopKFingerprints(unittest.TestCase):
         expected_data[PROPORTION_FIELD] = []  # Added during the computation
         # Empty dataframe with columns only
         expected_dataframe = pd.DataFrame(expected_data)
-        # Needed to put the right type
-        expected_dataframe = expected_dataframe.astype(dtype={
-            ATTRIBUTES[0].name: 'object', ATTRIBUTES[1].name: 'int64',
-            ATTRIBUTES[2].name: 'int'
-        })
-        resulting_dataframe = _get_top_k_fingerprints(self._dataset.dataframe,
-                                                      self._attribute_names, 0)
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        resulting_dataframe = _get_top_k_fingerprints(
+            self._dataset.dataframe, self._attribute_names, 0)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            resulting_dataframe = resulting_dataframe._to_pandas()
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_dtype=False, check_index_type=False)
 
     def test_top_1_fingerprint(self):
         # Rows seem to be sorted : (Chrome, 100, 1) is then first...
@@ -42,9 +43,12 @@ class TestGetTopKFingerprints(unittest.TestCase):
                          ATTRIBUTES[2].name: [1],
                          PROPORTION_FIELD: [1/5]}
         expected_dataframe = pd.DataFrame(expected_data)
-        resulting_dataframe = _get_top_k_fingerprints(self._dataset.dataframe,
-                                                      self._attribute_names, 1)
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        resulting_dataframe = _get_top_k_fingerprints(
+            self._dataset.dataframe, self._attribute_names, 1)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            resulting_dataframe = resulting_dataframe._to_pandas()
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_dtype=False, check_index_type=False)
 
     def test_top_3_fingerprints_non_uniques(self):
         # Rows seem to be sorted : (Chrome, 1) is then before (Edge, 1)
@@ -56,9 +60,12 @@ class TestGetTopKFingerprints(unittest.TestCase):
             PROPORTION_FIELD: [2/5, 2/5, 1/5]
         }
         expected_dataframe = pd.DataFrame(expected_data)
-        resulting_dataframe = _get_top_k_fingerprints(self._dataset.dataframe,
-                                                      attribute_names, 3)
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        resulting_dataframe = _get_top_k_fingerprints(
+            self._dataset.dataframe, attribute_names, 3)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            resulting_dataframe = resulting_dataframe._to_pandas()
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_dtype=False, check_index_type=False)
 
     def test_top_42_fingerprints_non_uniques(self):
         # Rows seem to be sorted : (Chrome, 1) is then before (Edge, 1)
@@ -70,15 +77,18 @@ class TestGetTopKFingerprints(unittest.TestCase):
             PROPORTION_FIELD: [2/5, 2/5, 1/5]
         }
         expected_dataframe = pd.DataFrame(expected_data)
-        resulting_dataframe = _get_top_k_fingerprints(self._dataset.dataframe,
-                                                      attribute_names, 42)
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        resulting_dataframe = _get_top_k_fingerprints(
+            self._dataset.dataframe, attribute_names, 42)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            resulting_dataframe = resulting_dataframe._to_pandas()
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_dtype=False, check_index_type=False)
 
 
 class TestPreprocessOneFpPerBrowser(unittest.TestCase):
 
     def setUp(self):
-        self._dataset = DummyFingerprintDataset(path.abspath(__file__))
+        self._dataset = DummyFingerprintDataset()
 
     def test_last_fingerprint_equivalent_to_descending(self):
         expected_data = {
@@ -97,6 +107,8 @@ class TestPreprocessOneFpPerBrowser(unittest.TestCase):
             inplace=True)
         resulting_dataframe = _preprocess_one_fp_per_browser(
             self._dataset.dataframe)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            resulting_dataframe = resulting_dataframe._to_pandas()
         assert_frame_equal(resulting_dataframe, expected_dataframe)
 
     def test_first_fingerprint_equivalent_to_ascending(self):
@@ -116,6 +128,8 @@ class TestPreprocessOneFpPerBrowser(unittest.TestCase):
             inplace=True)
         resulting_dataframe = _preprocess_one_fp_per_browser(
             self._dataset.dataframe, last_fingerprint=False)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            resulting_dataframe = resulting_dataframe._to_pandas()
         assert_frame_equal(resulting_dataframe, expected_dataframe)
 
     def test_empty_dataset(self):
@@ -130,18 +144,26 @@ class TestPreprocessOneFpPerBrowser(unittest.TestCase):
         ascending_result_dataframe = _preprocess_one_fp_per_browser(
             dataframe, last_fingerprint=False)
         descending_result_dataframe = _preprocess_one_fp_per_browser(dataframe)
+        # No need to check for modin.pandas DataFrame as the same empty
+        # DataFrame will be returned
         assert_frame_equal(ascending_result_dataframe, dataframe)
         assert_frame_equal(descending_result_dataframe, dataframe)
 
     def test_dataset_already_clean(self):
-        clean_dataset = DummyCleanDataset(path.abspath(__file__))
+        clean_dataset = DummyCleanDataset()
+        clean_dataframe = clean_dataset.dataframe
         ascending_result_dataframe = _preprocess_one_fp_per_browser(
             clean_dataset.dataframe, last_fingerprint=False)
         descending_result_dataframe = _preprocess_one_fp_per_browser(
             clean_dataset.dataframe)
-        assert_frame_equal(ascending_result_dataframe, clean_dataset.dataframe)
-        assert_frame_equal(descending_result_dataframe,
-                           clean_dataset.dataframe)
+        if config['DataAnalysis']['engine'] == 'modin.pandas':
+            clean_dataframe = clean_dataframe._to_pandas()
+            ascending_result_dataframe = (
+                ascending_result_dataframe._to_pandas())
+            descending_result_dataframe = (
+                descending_result_dataframe._to_pandas())
+        assert_frame_equal(ascending_result_dataframe, clean_dataframe)
+        assert_frame_equal(descending_result_dataframe, clean_dataframe)
 
 
 if __name__ == '__main__':

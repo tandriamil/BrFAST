@@ -11,9 +11,11 @@ from brfast.measures.usability_cost.fpselect import (
 
 from tests.data import ATTRIBUTES
 
-SIZES = {1: 52.25, 2: 42.56, 3: 1}
-INSTABILITIES = {1: 0.05, 2: 0.15, 3: 0.0}
-COLLECTION_TIMES = {1: (0.05, False), 2: (0.0001, False), 3: (0.003, False)}
+SIZES = {ATTRIBUTES[0]: 52.25, ATTRIBUTES[1]: 42.56, ATTRIBUTES[2]: 1}
+INSTABILITIES = {ATTRIBUTES[0]: 0.05, ATTRIBUTES[1]: 0.15, ATTRIBUTES[2]: 0.0}
+COLLECTION_TIMES = {ATTRIBUTES[0]: (0.05, False),
+                    ATTRIBUTES[1]: (0.0001, False),
+                    ATTRIBUTES[2]: (0.003, False)}
 WEIGHTS = {CostDimension.MEMORY: 1, CostDimension.INSTABILITY: 100,
            CostDimension.TIME: 1000}
 
@@ -140,7 +142,8 @@ class TestMemoryInstabilityTime(unittest.TestCase):
         # Sequential / asynchronous mix, but the total collection time of the
         # sequential attributes is higher than the higher asynchronous time.
         collection_times_mix_seq_max = {
-            1: (0.05, False), 2: (0.02, False), 3: (0.06, True)
+            ATTRIBUTES[0]: (0.05, False), ATTRIBUTES[1]: (0.02, False),
+            ATTRIBUTES[2]: (0.06, True)
         }
         memory_instability_time_measure = MemoryInstabilityTime(
             SIZES, INSTABILITIES, collection_times_mix_seq_max, WEIGHTS)
@@ -179,7 +182,8 @@ class TestMemoryInstabilityTime(unittest.TestCase):
         # single asynchronous attribute is higher than the total collection
         # time of the sequential attributes.
         collection_times_mix_async_max = {
-            1: (0.05, False), 2: (0.02, False), 3: (0.09, True)
+            ATTRIBUTES[0]: (0.05, False), ATTRIBUTES[1]: (0.02, False),
+            ATTRIBUTES[2]: (0.09, True)
         }
         memory_instability_time_measure = MemoryInstabilityTime(
             SIZES, INSTABILITIES, collection_times_mix_async_max, WEIGHTS)
@@ -192,7 +196,7 @@ class TestMemoryInstabilityTime(unittest.TestCase):
         expected_instability_cost = sum(INSTABILITIES.values())
         expected_weighted_instability_cost = (
             expected_instability_cost * WEIGHTS[CostDimension.INSTABILITY])
-        expected_time_cost = collection_times_mix_async_max[3][0]
+        expected_time_cost = collection_times_mix_async_max[ATTRIBUTES[2]][0]
         expected_weighted_time_cost = (
             expected_time_cost * WEIGHTS[CostDimension.TIME])
         expected_cost = sum((expected_weighted_memory_cost,
@@ -213,7 +217,8 @@ class TestMemoryInstabilityTime(unittest.TestCase):
     def test_evaluate_sequential_asynchronous_only(self):
         # Asynchronous attributes only.
         collection_times_async_only = {
-            1: (0.05, True), 2: (0.08, True), 3: (0.03, True)
+            ATTRIBUTES[0]: (0.05, True), ATTRIBUTES[1]: (0.08, True),
+            ATTRIBUTES[2]: (0.03, True)
         }
         memory_instability_time_measure = MemoryInstabilityTime(
             SIZES, INSTABILITIES, collection_times_async_only, WEIGHTS)
