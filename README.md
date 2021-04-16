@@ -100,6 +100,9 @@ support of some libraries.
    ```
 5. Copy the `config.ini.template` to `config.ini` to use the default
    configuration. You can edit this file to meet your needs.
+   ```sh
+   cp config.ini.template config.ini
+   ```
 
 
 

@@ -30,10 +30,16 @@
                 <th scope="row">Sensitivity threshold</th>
                 <td>{{ parameters['sensitivity_threshold'] }}</td>
               </tr>
-              <tr>
-                <th scope="row">Paths explored</th>
-                <td>3</td>
-              </tr>
+              {% if parameters['method'] == 'FPSelect' %}
+                <tr>
+                  <th scope="row">Paths explored</th>
+                  <td>{{ parameters['explored_paths'] }}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Use pruning methods</th>
+                  <td>{{ parameters['pruning'] }}</td>
+                </tr>
+              {% endif %}
               <tr>
                 <th scope="row">Fingerprint dataset</th>
                 <td>{{ parameters['dataset'] }}</td>
