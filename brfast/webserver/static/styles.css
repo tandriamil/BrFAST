@@ -4,7 +4,7 @@ main > .container {
 }
 
 /* Separate the columns with a padding of 10px */
-.col {
+.margin-top-bottom {
   margin-top: 10px;
   margin-bottom: 10px;
 }

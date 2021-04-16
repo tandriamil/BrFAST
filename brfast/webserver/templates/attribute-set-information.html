@@ -8,7 +8,7 @@
   <div class="row">
     <!-- Fingerprint sample only if a fingerprint dataset is set -->
     {% if fingerprint_sample %}
-      <div class="col">
+      <div class="col margin-top-bottom">
         <div class="card">
           <div class="card-header">
             Fingerprint sample
@@ -41,7 +41,7 @@
 
     {% else %}
     <!-- Attribute names if no fingerprint dataset is set -->
-      <div class="col">
+      <div class="col margin-top-bottom">
         <div class="card">
           <div class="card-header">
             Attributes
@@ -55,10 +55,14 @@
     {% endif %}
 
     <!-- Visualization of the usability gains -->
-    <div class="col">
+    <div class="col margin-top-bottom">
       <div class="card">
         <div class="card-header">
-          Usability gain compared to the complete attribute set
+          Relative cost compared to the maximum
+
+          <span data-bs-toggle="tooltip" data-bs-placement="top" title="This is the relative cost of the attribute set according to the maximum cost when using the candidate attributes (i.e., all of the available attributes).">
+            <i class="bi bi-question-circle-fill" style="font-size: 20px;"></i>
+          </span>
         </div>
         <div class="card-body">
           {% for (cost_dimension, (progress_bar_class, cost_percentage)) in usability_cost_ratio.items() %}
@@ -75,7 +79,7 @@
     <!-- End of the visualization of the usability gains -->
 
     <!-- Attribute set information -->
-    <div class="col">
+    <div class="col margin-top-bottom">
       <div class="card">
         <div class="card-header">
           Attribute set information

@@ -243,7 +243,7 @@ function updateNodesAndLinks(newNodes) {
 
 /**
  * The action triggered on the click event on the nodes. It opens a new tab
- * to the page displaying the informations about an attribute set.
+ * to the page displaying the information about an attribute set.
  * @note The variable this refers to the node that was clicked.
  */
 function nodeClickAction() {
@@ -254,7 +254,7 @@ function nodeClickAction() {
 
 /**
  * The action triggered on the mouseenter event on the nodes. It shows the
- * informations about the node.
+ * information about the node.
  */
 function nodeMouseEnterAction() {
   // We dispose of all the existing popovers to fix the bug of shadowing popover
@@ -312,7 +312,7 @@ function nodeMouseEnterAction() {
 
 /**
  * The action triggered on the mouseleave event on the nodes. It hides the
- * informations about the node.
+ * information about the node.
  */
 function nodeMouseLeaveAction() {
   $(this).popover('dispose');
@@ -333,10 +333,13 @@ function circleColour(node) {
       return 'orange';
 
     case ATTRIBUTE_SET_STATE.SATISFYING:  // Satisfying the sensitivity
+      // The best solution is in red
+      if (bestSolution && node.id == bestSolution.id)
+        return 'red';
       return 'green';
 
     case ATTRIBUTE_SET_STATE.EMPTY_NODE:  // The empty node
-      return 'red';
+      return 'cyan';
 
     default:  // Otherwise, just colour as explored
       console.warn('Unknown node state: ' + node.state);
@@ -475,11 +478,11 @@ function updateFromJsonResponse(jsonResponse) {
     initializeExplorationState(newNodes);
   }
 
-  // Update the visual node and links
-  updateNodesAndLinks(newNodes);
-
   // Update the graphical elements on the web page
   updateExplorationState(newNodes);
+
+  // Update the visual node and links
+  updateNodesAndLinks(newNodes);
 }
 
 
@@ -507,7 +510,7 @@ function updateExplorationState(newNodes) {
   // Update the best solution
   if (newBestSolution) {
 
-    // Update the exploration state textual informations
+    // Update the exploration state textual information
     $('#best-solution').text(bestSolution.id);
     $('#best-solution').attr('href', ATTRIBUTE_SET_URL + '/' + bestSolution.id);
     $('#best-solution').attr('target', '_blank');

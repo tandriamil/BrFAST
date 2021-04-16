@@ -22,8 +22,17 @@ BrFAST (Browser Fingerprinting Attribute Selection Tool)
         <li><a href="#installation">Installation</a></li>
       </ul>
     </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#testing-code-coverage-and-documentation-generation">Testing, code coverage and documentation generation</a></li>
+    <li>
+      <a href="#usages">Usages</a>
+      <ul>
+        <li><a href="#preparing-the-publicly-available-fingerprint-datasets">Preparing the publicly available fingerprint datasets</a>
+        <li><a href="#measuring-the-usability-cost-of-the-attributes">Measuring the usability cost of the attributes</a></li>
+        <li><a href="#running-brfast-from-the-command-line">Running BrFAST from the command line</a></li>
+        <li><a href="#displaying-the-visualization-of-brfast-as-a-web-application">Displaying the visualization of BrFAST as a web application</a></li>
+        <li><a href="#testing-code-coverage-and-documentation-generation">Testing, code coverage and documentation generation</a></li>
+      </ul>
+    </li>
+    <li><a href="#architecture">Architecture</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -111,7 +120,8 @@ necessary assets and instructions in
 
 We pre-compute the usability cost of the attributes and provide these results
 to our usability cost measures. The scripts to measure these usability costs
-are in the `executables/measures` directory.
+are in the `executables/measures` directory. We also provide the resulting
+measures in the `assets/data/[dataset]-measures` directories.
 
 **Average attribute size**
 
@@ -196,7 +206,13 @@ considering the Cartesian product of the values of each parameter. You must at
 least edit the `BASE_PATH` and check the `DATA_DIRECTORIES` directories.
 
 The input directories should contain the same files as for the single
-execution, and the same sensitivity and usability cost measures are used.
+execution. The same sensitivity and usability cost measures as for the single
+execution are used.
+
+The resulting traces of these executions are written in the same directory as
+the input directory of an execution. The name of a trace is composed of the
+attribute selection method, the sensitivity threshold, the number of submissions
+by the attacker, and the weights of the usability costs, separated by dashes.
 
 
 ### Displaying the visualization of BrFAST as a web application
@@ -206,24 +222,25 @@ For now, you can only visualize the replay of an execution trace obtained from
 a command line execution, but we plan to include a real-time visualization in
 the future. To replay an execution trace, here are the steps:
 
-1. Set the Flask environment variables.
+1. Set the Flask environment variables:
   ```sh
   export FLASK_APP=brfast.webserver.application
   # The following is optional and shows verbose logs when errors are encountered
   # export FLASK_ENV=debug
-  # The following is optional and helps to reload the application after edits
+  # The following is optional and reloads the application after each edit
   # export FLASK_ENV=development
   ```
-2. Run the Flask application.
+2. Run the Flask application:
   ```sh
-  flask run
+  python -m flask run
   # You can specify a port if you run several applications
-  # flask run --port 5001
+  # python -m flask run --port 5001
   ```
 3. Open you web browser to the [default home page](http://127.0.0.1:5000).
 4. Choose to replay a trace.
 5. Provide a trace file (required), the corresponding fingerprint dataset
-   (optional), and send the files.
+   (optional), and send the files. You can find traces in the
+   `assets/data/[dataset]-traces` directories.
 
 The visualization of the replay page is then displayed with
 - The parameters of the execution from which the trace was saved.
@@ -236,7 +253,7 @@ The visualization of the replay page is then displayed with
   that were explored are in blue, the starting empty set is in red, those that
   were pruned are in orange, and those that satisfy the sensitivity threshold
   are in green.
-- Passing the mouse over an attribute set shows its informations, and clicking
+- Passing the mouse over an attribute set shows its information, and clicking
   on it opens a new tab with additional information about this attribute set.
 
 
@@ -271,6 +288,8 @@ Below, we describe the content of each module of this project.
 
 The `assets` directory contains assets related to BrFAST.
 - `architecture.md` describes the architecture of the `brfast` module.
+- `data` contains the results of the usability cost measures and traces of  
+  execution for the two publicly available browser fingerprint datasets.
 
 ### brfast
 
@@ -314,7 +333,7 @@ features to come are listed below.
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See the `LICENSE` file for more information.
 
 
 
