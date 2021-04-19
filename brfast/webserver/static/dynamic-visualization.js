@@ -439,8 +439,7 @@ function getAndUpdateNodes() {
   xhr.onload = function (e) {
     if (xhr.readyState === 4) {
       if (xhr.status === 200) {
-        const response = xhr.responseText;
-        if (response != '[]') {
+        if (xhr.responseText != '[]') {
           updateFromJsonResponse(xhr.responseText);
           nextNodeId = nextNodeId + STEP + 1;
           setTimeout(getAndUpdateNodes, COLLECT_FREQUENCY);
@@ -539,7 +538,7 @@ function updateExplorationState(newNodes) {
   }
 
   // Update the number of explored nodes
-  $('#explored-nodes').text(nodes.length);
+  $('#explored-nodes').text(nodes.length + newNodes.length);
 }
 
 

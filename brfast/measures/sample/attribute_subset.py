@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Init file of the measures.sample module."""
+"""Module containing the collection of a fingerprint subset."""
 
 from typing import Any, List
 
@@ -7,7 +7,7 @@ from brfast.data import AttributeSet, FingerprintDataset
 from brfast.measures import Analysis
 
 
-class AttributeSubsetSample(Analysis):
+class AttributeSetSample(Analysis):
     """Sample of the fingerprints considering a subset of the attributes."""
 
     def __init__(self, dataset: FingerprintDataset, attributes: AttributeSet,

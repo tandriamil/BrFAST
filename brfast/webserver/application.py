@@ -3,15 +3,19 @@
 
 import secrets
 
-from flask import (flash, Flask, json, redirect, request, render_template,
-                   url_for)
+from flask import (abort, flash, Flask, json, jsonify, redirect, request,
+                   render_template, url_for)
 from loguru import logger
 from werkzeug.utils import secure_filename
 
 from brfast.data import (Attribute, AttributeSet,
                          FingerprintDatasetFromCSVInMemory)
 from brfast.exploration import State, TraceData
-from brfast.measures.sample.attribute_subset import AttributeSubsetSample
+from brfast.measures.sample.attribute_subset import AttributeSetSample
+from brfast.measures.distinguishability.entropy import AttributeSetEntropy
+from brfast.measures.distinguishability.unicity import (
+    AttributeSetUnicity, UNICITY_RATE_RESULT, UNIQUE_FPS_RESULT,
+    TOTAL_BROWSERS_RESULT)
 from brfast.webserver.file_utils import allowed_extension
 
 # Global variables used for the backend application
@@ -143,8 +147,9 @@ def get_trace(start, end):
 
     # No trace data => returns an empty list
     if not TRACE_DATA:
-        logger.warning('Trying to access get-trace without a trace set.')
-        return '[]'
+        error_message = 'Trying to access get-trace without a trace set.'
+        logger.error(error_message)
+        abort(404, description=error_message)
 
     # Provide the explored attribute sets
     logger.info(f'Getting the trace from {start} to {end}.')
@@ -195,7 +200,8 @@ def attribute_set_information(attribute_set_id):
     # results from it (the subset for now)
     fingerprint_sample = None
     if FINGERPRINT_DATASET:
-        attr_subset_sample = AttributeSubsetSample(
+        # Collect a sample of the resulting fingerprints
+        attr_subset_sample = AttributeSetSample(
             FINGERPRINT_DATASET, attributes, FINGERPRINT_SAMPLE_SIZE)
         attr_subset_sample.execute()
         fingerprint_sample = attr_subset_sample.result
@@ -249,3 +255,114 @@ def attribute_set_information(attribute_set_id):
                            attribute_set_state=attribute_set_state,
                            usability_cost_ratio=usability_cost_ratio,
                            fingerprint_sample=fingerprint_sample)
+
+
+@app.route('/attribute-set-entropy/<int:attribute_set_id>')
+def attribute_set_entropy(attribute_set_id):
+    """Provide the results about the entropy of an attribute set.
+
+    Args:
+        attribute_set_id: The id of the attribute set for which to provide the
+                          entropy results.
+    """
+    global TRACE_DATA
+    global FINGERPRINT_DATASET
+    logger.info('Getting the entropy results of the attribute set '
+                f'{attribute_set_id}.')
+
+    # If there is no trace data, show an error and redirect to the index page
+    if not TRACE_DATA:
+        error_message = 'No trace data set'
+        logger.error(error_message)
+        abort(404, description=error_message)
+
+    # Check that there is an explored attribute set with this id in the trace
+    attribute_set_infos = None
+    for explored_attr_set in TRACE_DATA['exploration']:
+        if explored_attr_set['id'] == attribute_set_id:
+            attribute_set_infos = explored_attr_set
+            break
+
+    if not attribute_set_infos:
+        error_message = (f'The attribute set id {attribute_set_id} was not '
+                         'found.')
+        logger.error(error_message)
+        abort(404, description=error_message)
+
+    # Generate the attribute set object and get the names of these attributes
+    attributes = AttributeSet(
+        Attribute(attribute_id, TRACE_DATA['attributes'][str(attribute_id)])
+        for attribute_id in attribute_set_infos['attributes']
+    )
+
+    if not FINGERPRINT_DATASET:
+        error_message = 'No fingerprint dataset is set'
+        logger.error(error_message)
+        abort(404, description=error_message)
+
+    # Compute the entropy of the resulting fingerprints
+    attr_set_entropy = AttributeSetEntropy(FINGERPRINT_DATASET, attributes)
+    attr_set_entropy.execute()
+    entropy_result = attr_set_entropy.result
+
+    # Return the json version of these results
+    return jsonify(entropy_result)
+
+
+@app.route('/attribute-set-unicity/<int:attribute_set_id>')
+def attribute_set_unicity(attribute_set_id):
+    """Provide the results about the unicity of an attribute set.
+
+    Args:
+        attribute_set_id: The id of the attribute set for which to provide the
+                          unicity results.
+    """
+    global TRACE_DATA
+    global FINGERPRINT_DATASET
+    logger.info('Getting the unicity results of the attribute set '
+                f'{attribute_set_id}.')
+
+    # If there is no trace data, show an error and redirect to the index page
+    if not TRACE_DATA:
+        error_message = 'No trace data set'
+        logger.error(error_message)
+        abort(404, description=error_message)
+
+    # Check that there is an explored attribute set with this id in the trace
+    attribute_set_infos = None
+    for explored_attr_set in TRACE_DATA['exploration']:
+        if explored_attr_set['id'] == attribute_set_id:
+            attribute_set_infos = explored_attr_set
+            break
+
+    if not attribute_set_infos:
+        error_message = (f'The attribute set id {attribute_set_id} was not '
+                         'found.')
+        logger.error(error_message)
+        abort(404, description=error_message)
+
+    # Generate the attribute set object and get the names of these attributes
+    attributes = AttributeSet(
+        Attribute(attribute_id, TRACE_DATA['attributes'][str(attribute_id)])
+        for attribute_id in attribute_set_infos['attributes']
+    )
+
+    if not FINGERPRINT_DATASET:
+        error_message = 'No fingerprint dataset is set'
+        logger.error(error_message)
+        abort(404, description=error_message)
+
+    # Compute the unicity of the resulting fingerprints
+    attr_set_unicity = AttributeSetUnicity(FINGERPRINT_DATASET, attributes)
+    attr_set_unicity.execute()
+    unicity_result = attr_set_unicity.result
+
+    # We need to format the results due to unsupported json conversions
+    unicity_result[UNICITY_RATE_RESULT] = float(
+        unicity_result[UNICITY_RATE_RESULT])
+    unicity_result[UNIQUE_FPS_RESULT] = int(unicity_result[UNIQUE_FPS_RESULT])
+    unicity_result[TOTAL_BROWSERS_RESULT] = int(
+        unicity_result[TOTAL_BROWSERS_RESULT])
+
+    # Return the json version of these results
+    return jsonify(unicity_result)

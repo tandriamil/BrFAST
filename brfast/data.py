@@ -4,8 +4,10 @@
 import importlib
 from io import TextIOWrapper
 from os import path
+from threading import Lock
 from typing import Iterable, List, Optional
 
+from loguru import logger
 from sortedcontainers import SortedDict
 
 # Import the engine of the analysis module (pandas or modin)
@@ -13,6 +15,7 @@ from brfast import config
 pd = importlib.import_module(config['DataAnalysis']['engine'])
 
 
+# ============================== Utility classes ==============================
 class MetadataField:
     """Class representing the required metadata fields."""
 
@@ -25,6 +28,7 @@ class MissingMetadatasFields(Exception):
     """The required metadatas columns are missing from the dataset."""
 
 
+# ========================= Attribute related classes =========================
 class Attribute:
     """
     The Attribute class to represent an attribute.
@@ -236,12 +240,21 @@ class AttributeSet:
         raise KeyError(f'No attribute is named {name}.')
 
 
+# ==================== Fingerprint dataset related classes ====================
 class FingerprintDataset:
     """A fingerprint dataset (abstract class)."""
 
     def __init__(self):
         """Initialize."""
         self._dataframe, self._candidate_attributes = None, None
+
+        # The dataframes with a single fingerprint per browser, lazily computed
+        self._first_fp_df, self._last_fp_df = None, None
+
+        # The locks related to the previous dataframes, as Flask is
+        # multithreaded and the access of this data can be parallel in some GET
+        # requests
+        self._first_fp_df_lock, self._last_fp_df_lock = Lock(), Lock()
 
         # Process the dataset
         self._process_dataset()
@@ -306,6 +319,102 @@ class FingerprintDataset:
             The candidate attributes as an AttributeSet.
         """
         return self._candidate_attributes
+
+    def get_df_w_one_fp_per_browser(self, last_fingerprint: bool = True
+                                    ) -> pd.DataFrame:
+        """Provide a dataframe with only one fingerprint per browser.
+
+        Args:
+            last_fingerprint: Whether we should only hold the last fingerprint
+                              of each user, otherwise it is the first
+                              fingerprint.
+
+        Returns:
+            A dataframe with only one fingerprint per browser, which is the
+            first or the last one.
+        """
+        # Last fingerprint
+        if last_fingerprint:
+
+            logger.debug(f'Getting the dataframe {self} with the last '
+                         'fingerprint only for each browser')
+
+            # Do this inside the lock due to multithreading
+            self._last_fp_df_lock.acquire()
+            try:
+                logger.debug('Acquired the _last_fp_df_lock lock')
+                if self._last_fp_df is None:
+                    logger.debug(f'Generate the dataframe {self} with the last'
+                                 ' fingerprint only for each browser')
+                    self._last_fp_df = self._preprocess_one_fp_per_browser(
+                        last_fingerprint)
+            finally:
+                self._last_fp_df_lock.release()
+                logger.debug('Released the _last_fp_df_lock lock')
+
+            # Return the resulting DataFrame
+            return self._last_fp_df
+
+        # First fingerprint
+        logger.debug(f'Getting the dataframe {self} with the first '
+                     'fingerprint only for each browser')
+
+        # Do this inside the lock due to multithreading
+        self._first_fp_df_lock.acquire()
+        try:
+            logger.debug('Acquired the _first_fp_df_lock lock')
+            if self._first_fp_df is None:
+                logger.debug(f'Generate the dataframe {self} with the first '
+                             'fingerprint only for each browser')
+                self._first_fp_df = self._preprocess_one_fp_per_browser(
+                    last_fingerprint)
+        finally:
+            self._first_fp_df_lock.release()
+            logger.debug('Released the _last_fp_df_lock lock')
+
+        # Return the resulting DataFrame
+        return self._first_fp_df
+
+    def _preprocess_one_fp_per_browser(self, last_fingerprint: bool = True
+                                       ) -> pd.DataFrame:
+        """Preprocess this fingerprint dataset to hold a single fp per browser.
+
+        Args:
+            last_fingerprint: Whether we should only hold the last fingerprint
+                              of each user, otherwise it is the first
+                              fingerprint.
+
+        Returns:
+            A dataframe with only one fingerprint per browser, which is the
+            first or the last one.
+        """
+        which_fp_to_hold = 'last' if last_fingerprint else 'first'
+        logger.debug('Preprocessing the dataset to hold a single fingerprint '
+                     f'per browser, taking the {which_fp_to_hold} '
+                     'fingerprint.')
+
+        # If the dataframe is empty, just return it
+        if self._dataframe.empty:
+            logger.debug('The given dataframe is empty, returning the '
+                         'dataframe without modifying it.')
+            return self._dataframe
+
+        # 1. We group the fingerprints (=rows) by the browser id. As we do not
+        #    care about the order of the browser ids, we turn the sorting off
+        #    for better performances. We need to disable the group keys to not
+        #    have an additional index with the value of the index 'browser_id'.
+        grouped_by_browser = self._dataframe.groupby(
+            MetadataField.BROWSER_ID, sort=False, group_keys=False)
+
+        # 2. For each group (= a browser id), we sort the fingerprints by the
+        #    time they were collected at. If we want the last fingerprint, then
+        #    we sort them in descending manner (= not ascending) to have the
+        #    latest first.
+        # 3. We only hold a fingerprint for each group, hence for each browser.
+        return grouped_by_browser.apply(
+            lambda row: row.sort_values(MetadataField.TIME_OF_COLLECT,
+                                        ascending=not last_fingerprint)
+                           .head(1))
 
 
 class FingerprintDatasetFromFile(FingerprintDataset):

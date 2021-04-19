@@ -60,49 +60,6 @@ def _get_top_k_fingerprints(dataframe: pd.DataFrame,
             )
 
 
-def _preprocess_one_fp_per_browser(dataframe: pd.DataFrame,
-                                   last_fingerprint: bool = True
-                                   ) -> pd.DataFrame:
-    """Preprocess a fingerprint dataset used for the sensitivity measures.
-
-    The preprocessing only holds the first (or last) fingerprint of each user.
-
-    Args:
-        dataframe: The fingerprint dataset.
-        last_fingerprint: Whether we should only hold the last fingerprint of
-                          each user, otherwise it is the first fingerprint.
-
-    Returns:
-        A clean dataset that is used for the sensitivity measure having only
-        one fingerprint for each browser.
-    """
-    which_fp_to_hold = 'last' if last_fingerprint else 'first'
-    logger.debug('Preprocessing the dataset to hold a single fingerprint per '
-                 f'browser, taking the {which_fp_to_hold} fingerprint.')
-
-    # If the dataframe is empty, just return it
-    if dataframe.empty:
-        logger.debug('The given dataframe is empty, returning the dataframe '
-                     'without modifying it.')
-        return dataframe
-
-    # 1. We group the fingerprints (=rows) by the browser id. As we do not care
-    #    about the order of the browser ids, we turn the sorting off for
-    #    better performances. We need to disable the group keys to not have an
-    #    additional index with the value of the index 'browser_id'.
-    grouped_by_browser = dataframe.groupby(MetadataField.BROWSER_ID,
-                                           sort=False, group_keys=False)
-
-    # 2. For each group (= a browser id), we sort the fingerprints by the time
-    #    they were collected at. If we want the last fingerprint, then we sort
-    #    them in descending manner (= not ascending) to have the latest first.
-    # 3. We only hold a fingerprint for each group, hence for each browser.
-    return grouped_by_browser.apply(
-        lambda row: row.sort_values(MetadataField.TIME_OF_COLLECT,
-                                    ascending=not last_fingerprint)
-                       .head(1))
-
-
 # class SimilarAttributes(SensitivityMeasure):
 #     """The sensivity measure used in the FPSelect paper.
 #
@@ -130,8 +87,8 @@ def _preprocess_one_fp_per_browser(dataframe: pd.DataFrame,
 #
 #         # Set the variables used to compute the sensitivity
 #         self._fingerprint_dataset = fingerprint_dataset
-#         self._working_dataframe = _preprocess_one_fp_per_browser(
-#             fingerprint_dataset.dataset)
+#         self._working_dataframe = (
+#             fingerprint_dataset.get_df_w_one_fp_per_browser())
 #         self._k = most_common_fps
 #         self._attr_dist_info = attr_dist_info
 #
@@ -196,8 +153,8 @@ class TopKFingerprints(SensitivityMeasure):
 
         # Set the variables used to compute the sensitivity
         self._fingerprint_dataset = fingerprint_dataset
-        self._working_dataframe = _preprocess_one_fp_per_browser(
-            fingerprint_dataset.dataframe)
+        self._working_dataframe = (
+            fingerprint_dataset.get_df_w_one_fp_per_browser())
         self._k = most_common_fps
 
     def __repr__(self) -> str:

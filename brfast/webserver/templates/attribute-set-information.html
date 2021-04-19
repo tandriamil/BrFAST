@@ -95,7 +95,7 @@
             <tbody>
               <tr>
                 <th scope="row">Id</th>
-                <td>{{ attribute_set_infos['id'] }}</td>
+                <td id="attribute-set-id">{{ attribute_set_infos['id'] }}</td>
               </tr>
               <tr>
                 <th scope="row">State</th>
@@ -124,6 +124,59 @@
         </div>
       </div>
     </div>
+    <!-- End of the attribute set information -->
+
+    <!-- Resulting fingerprint information  -->
+    <div class="col margin-top-bottom">
+      <div class="card">
+        <div class="card-header">
+          Distinguishability of the resulting fingerprints
+        </div>
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th scope="col">Information</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Entropy</th>
+                <td id="attribute-set-entropy">...</td>
+              </tr>
+              <tr>
+                <th scope="row">Normalized entropy</th>
+                <td id="attribute-set-normalized-entropy">...</td>
+              </tr>
+              <tr>
+                <th scope="row">Maximum entropy</th>
+                <td id="attribute-set-maximum-entropy">...</td>
+              </tr>
+              <tr>
+                <th scope="row">Unicity rate</th>
+                <td id="attribute-set-unicity-rate">...</td>
+              </tr>
+              <tr>
+                <th scope="row">Unique fingerprints</th>
+                <td id="attribute-set-unique-fingerprints">...</td>
+              </tr>
+              <tr>
+                <th scope="row">Total browsers</th>
+                <td id="attribute-set-total-browsers">...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- End of the information about the resulting fingerprints information -->
+
   </div>
-  <!-- End of the attribute set information -->
+{% endblock %}
+
+
+{% block js_libraries %}
+  <!-- JS script to collect the information about an attribute set asynchronously -->
+  <script type="text/javascript" src="{{ url_for('static', filename='dynamic-attribute-set-information.js') }}"></script>
 {% endblock %}

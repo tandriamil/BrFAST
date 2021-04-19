@@ -182,8 +182,10 @@ You can use the optional arguments to specify the parameters:
 - `-t [threshold]`: The sensitivity threshold (default is `0.10`).
 - `-k [submissions]`: The number of submissions by the considered attacker.
                       This is the `k` used to measure the proportion of the
-                      users that share the `k` most common fingerprints.
-- `-o [trace_file]`: The path where to save the trace file if the option is set.
+                      users that share the `k` most common fingerprints
+                      (default is `4`).
+- `-o [trace_file]`: The path where to save the trace file if this option is
+                     set.
 - `-p [paths]`: The number of paths explored in the lattice of the possibilities
                 by FPSelect (default is `3`).
 - `--no-pruning`: Prevent from using the pruning methods of FPSelect.
