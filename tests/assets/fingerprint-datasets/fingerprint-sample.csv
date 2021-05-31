@@ -1,0 +1,6 @@
+browser_id,time_of_collect,user_agent,timezone,do_not_track
+1,2021-04-29 17:00:00,Firefox,60,1
+2,2021-04-29 18:00:00,Chrome,120,1
+3,2021-04-29 19:00:00,Edge,90,1
+2,2021-04-29 20:00:00,Chrome,120,1
+3,2021-04-29 21:00:00,Edge,90,1

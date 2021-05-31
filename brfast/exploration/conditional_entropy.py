@@ -1,25 +1,43 @@
 #!/usr/bin/python3
 """Module containing the exploration algorithm based on conditional entropy."""
 
+import importlib
 from datetime import datetime
+from math import ceil
+from multiprocessing import Pool
+from os import cpu_count
+from typing import Tuple
 
 from loguru import logger
 
+from brfast.config import params
+from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.dataset import FingerprintDataset
 from brfast.exploration import Exploration, State, TraceData
-from brfast.data import Attribute, AttributeSet, FingerprintDataset
 from brfast.measures.distinguishability.entropy import attribute_set_entropy
+pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 
 def _get_best_conditional_entropic_attribute(dataset: FingerprintDataset,
                                              current_attributes: AttributeSet,
                                              candidate_attributes: AttributeSet
                                              ) -> Attribute:
-    """Get the best conditional entropy attribute.
+    """Get the attribute that provides the highest total entropy.
+
+    When several attributes provide the same total entropy, the attribute of
+    the lowest id is given. If no attribute increases the total entropy, we
+    still provide the attribute of the lowest id.
 
     Args:
         dataset: The dataset used to compute the conditional entropy.
         current_attributes: The attributes that compose the current solution.
         candidate_attributes: The candidate attributes (i.e., those available).
+
+    Raises:
+        ValueError: There are candidate attributes and the fingerprint dataset
+                    is empty.
+        KeyError: One of the candidate attributes is not in the fingerprint
+                  dataset.
 
     Returns:
         The attribute that has the highest conditional entropy among the
@@ -28,10 +46,110 @@ def _get_best_conditional_entropic_attribute(dataset: FingerprintDataset,
     logger.debug('Getting the best conditional entropic attribute from '
                  f'{current_attributes}...')
 
-    # best_conditional_entropy is initialized to 0.0 to stop proposing a new
-    # attribute when no more attribute provides additional distinguishing
-    # information.
-    best_attribute, best_conditional_entropy = None, 0.0
+    # Some checks before starting the exploration
+    if candidate_attributes and dataset.dataframe.empty:
+        raise ValueError('Cannot compute the conditional entropy on an empty '
+                         'dataset.')
+    for attribute in candidate_attributes:
+        if attribute not in dataset.candidate_attributes:
+            raise KeyError(f'The attribute {attribute} is not in the dataset.')
+
+    # We will work on a dataset with only a fingerprint per browser to avoid
+    # overcounting effects
+    df_one_fp_per_browser = dataset.get_df_w_one_fp_per_browser()
+
+    # If we execute on a single process
+    if not params.getboolean('Multiprocessing', 'explorations'):
+        logger.debug('Measuring the attributes entropy on a single process...')
+        best_attribute, best_total_ent = _best_conditional_entropic_attribute(
+            df_one_fp_per_browser, current_attributes, candidate_attributes)
+        logger.debug(f'  The best attribute is {best_attribute} for a total '
+                     f'entropy of {best_total_ent}.')
+        return best_attribute
+
+    # The values to update through the search for the best attribute
+    best_attribute_informations = {}
+    logger.debug('Measuring the attributes conditional entropy using '
+                 'multiprocessing...')
+
+    # Infer the number of cores to use
+    free_cores = params.getint('Multiprocessing', 'free_cores')
+    nb_cores = max(cpu_count() - free_cores, 1)
+    attributes_per_core = int(ceil(len(candidate_attributes)/nb_cores))
+    logger.debug(f'Sharing {len(candidate_attributes)} candidate attributes '
+                 f'over {nb_cores}(+{free_cores}) cores, hence '
+                 f'{attributes_per_core} attributes per core.')
+
+    def update_best_conditional_entropy_attribute(result: Tuple[Attribute,
+                                                                float]):
+        """Update the best conditional entropy attribute.
+
+        Args:
+            result: A tuple with the best attribute and the best total entropy.
+
+        Note: This is executed by the main thread and does not pose any
+              concurrency or synchronization problem.
+        """
+        best_attribute, best_total_entropy = result
+        if best_attribute:  # To avoid the empty results which are None
+            best_attribute_informations[best_attribute] = best_total_entropy
+
+    # Spawn a number of processes equal to the number of cores
+    candidate_attributes_list = list(candidate_attributes)
+    async_results = []
+    with Pool(processes=nb_cores) as pool:
+        for process_id in range(nb_cores):
+            # Generate the candidate attributes for this process
+            start_id = process_id * attributes_per_core
+            end_id = (process_id + 1) * attributes_per_core
+            candidate_attributes_subset = AttributeSet(
+                candidate_attributes_list[start_id:end_id])
+
+            async_result = pool.apply_async(
+                _best_conditional_entropic_attribute,
+                args=(df_one_fp_per_browser, current_attributes,
+                      candidate_attributes_subset),
+                callback=update_best_conditional_entropy_attribute)
+            async_results.append(async_result)
+
+        # Wait for all the processes to finish (otherwise we would exit
+        # before collecting their result)
+        for async_result in async_results:
+            async_result.wait()
+
+    # Search for the best attribute in the local results. If several provide
+    # the same total entropy, we provide the attribute having the lowest id.
+    best_attribute, best_total_entropy = None, -float('inf')
+    for attribute in sorted(best_attribute_informations):
+        attribute_total_entropy = best_attribute_informations[attribute]
+        if attribute_total_entropy > best_total_entropy:
+            best_total_entropy = attribute_total_entropy
+            best_attribute = attribute
+
+    logger.debug(f'  The best attribute is {best_attribute} for a total '
+                 f'entropy of {best_total_entropy}.')
+
+    return best_attribute
+
+
+def _best_conditional_entropic_attribute(df_one_fp_per_browser: pd.DataFrame,
+                                         current_attributes: AttributeSet,
+                                         candidate_attributes: AttributeSet
+                                         ) -> Tuple[Attribute, float]:
+    """Get the best conditional entropic attribute among the candidates.
+
+    Args:
+        df_one_fp_per_browser: The dataframe with only one fingerprint per
+                               browser.
+        current_attributes: The attributes that compose the current solution.
+        candidate_attributes: The candidate attributes for this process to
+                              check.
+
+    Returns:
+        A tuple with the best attribute for this process and the total entropy
+        when adding this attribute to the current attributes.
+    """
+    best_local_attribute, best_local_total_entropy = None, -float('inf')
     for attribute in candidate_attributes:
 
         # Ignore the attributes that are already in the current attribute set
@@ -42,15 +160,15 @@ def _get_best_conditional_entropic_attribute(dataset: FingerprintDataset,
         attribute_set = AttributeSet(current_attributes)
         attribute_set.add(attribute)
 
-        # Evaluate the conditional entropy of this new attribute set
-        attr_set_entropy = attribute_set_entropy(dataset, attribute_set)
-        if attr_set_entropy > best_conditional_entropy:
-            best_attribute = attribute
-            best_conditional_entropy = attr_set_entropy
+        # Evaluate the conditional entropy of this new attribute set and save
+        # it in the dictionary
+        attr_set_entropy = attribute_set_entropy(df_one_fp_per_browser,
+                                                 attribute_set)
+        if attr_set_entropy > best_local_total_entropy:
+            best_local_attribute = attribute
+            best_local_total_entropy = attr_set_entropy
 
-    logger.debug(f'  The best attribute is {best_attribute} for a total '
-                 f'entropy of {best_conditional_entropy}.')
-    return best_attribute
+    return (best_local_attribute, best_local_total_entropy)
 
 
 class ConditionalEntropy(Exploration):
@@ -80,7 +198,12 @@ class ConditionalEntropy(Exploration):
             We use the ids of the attributes instead of their name to reduce
             the size of the trace in memory and when saved in json format.
         """
+        # The temporary solution (empty set) and the current sensitivity (1.0
+        # as it is equivalent to no browser fingerprinting used at all)
         temp_solution, sensitivity = AttributeSet(), 1.0
+
+        # We already checked that the sensitivity threshold is reachable, hence
+        # we always reach it when processing the Exploration
         while sensitivity > self._sensitivity_threshold:
 
             # Find the attribute that has the highest conditional entropy
@@ -109,15 +232,15 @@ class ConditionalEntropy(Exploration):
 
             # If it satisfies the sensitivity threshold, quit the loop
             if sensitivity <= self._sensitivity_threshold:
-                self._solution = temp_solution
+                self._update_solution(temp_solution)
                 attribute_set_state = State.SATISFYING
-                self._satisfying_attribute_sets.add(temp_solution)
+                self._add_satisfying_attribute_set(temp_solution)
             else:
                 attribute_set_state = State.EXPLORED
 
             # Store this attribute set in the explored sets
             compute_time = str(datetime.now() - self._start_time)
-            self._explored_attr_sets.append({
+            self._add_explored_attribute_set({
                 TraceData.TIME: compute_time,
                 TraceData.ATTRIBUTES: temp_solution.attribute_ids,
                 TraceData.SENSITIVITY: sensitivity,

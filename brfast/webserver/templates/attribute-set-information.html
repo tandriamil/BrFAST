@@ -69,7 +69,7 @@
           <div>
             {{ cost_dimension.capitalize() }} cost
             <div class="progress">
-              <div class="progress-bar bg{{ progress_bar_class }}" role="progressbar" style="width: {{ cost_percentage }}%" aria-valuenow="{{ cost_percentage }}" aria-valuemin="0" aria-valuemax="100">{{ cost_percentage }}%</div>
+              <div class="progress-bar {{ progress_bar_class }}" role="progressbar" style="width: {{ cost_percentage }}%" aria-valuenow="{{ cost_percentage }}" aria-valuemin="0" aria-valuemax="100">{{ cost_percentage }}%</div>
             </div>
           </div>
           {% endfor %}
@@ -126,7 +126,8 @@
     </div>
     <!-- End of the attribute set information -->
 
-    <!-- Resulting fingerprint information  -->
+    <!-- Resulting fingerprint information, only if a fingerprint dataset is set -->
+    {% if fingerprint_sample %}
     <div class="col margin-top-bottom">
       <div class="card">
         <div class="card-header">
@@ -171,12 +172,15 @@
       </div>
     </div>
     <!-- End of the information about the resulting fingerprints information -->
+    {% endif %}
 
   </div>
 {% endblock %}
 
 
 {% block js_libraries %}
-  <!-- JS script to collect the information about an attribute set asynchronously -->
-  <script type="text/javascript" src="{{ url_for('static', filename='dynamic-attribute-set-information.js') }}"></script>
+  {% if fingerprint_sample %}
+    <!-- JS script to collect the information about an attribute set asynchronously -->
+    <script type="text/javascript" src="{{ url_for('static', filename='dynamic-attribute-set-information.js') }}"></script>
+  {% endif %}
 {% endblock %}

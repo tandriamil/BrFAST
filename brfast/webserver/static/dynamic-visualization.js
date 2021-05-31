@@ -7,9 +7,6 @@
 
 // ##### Variables and parameters used for the visualization
 
-// The precision of the floating point numbers shown
-const FLOAT_PRECISION = 3;
-
 // The state of an attribute set
 const ATTRIBUTE_SET_STATE = {
    EXPLORED: 1,    // Simply explored
@@ -18,39 +15,30 @@ const ATTRIBUTE_SET_STATE = {
    EMPTY_NODE: 4   // The starting empty node
 };
 
-// The classes for the progress bars
-const PROGRESS_BAR_CLASSES = ['info', 'success', 'warning', 'danger'];
-
-// We limit the number of displayed nodes for performance reasons
-const NODES_LIMIT = 50;
-
 // The empty node
 const EMPTY_NODE = {
  id: -1, attributes: [], cost_explanation: {}, sensitivity: 1.0,
  state: ATTRIBUTE_SET_STATE.EMPTY_NODE, usability_cost: 0.0, time: '0:00:00.00'
 }
 
-// The id of the next node to collect, the STEP (i.e., how many attribute sets
-// are collected every x seconds), and the collect frequency (i.e., the time in
-// milliseconds after which we collect the next attribute sets)
+// The id of the next node to collect
 var nextNodeId = 0;
-const STEP = 25;
-const COLLECT_FREQUENCY = 2000;
 
-// The origin of the website and the URL for the /get-trace GET request
+// The origin of the website and the URL for the /get-explored-attribute-sets
+// GET request
 const BRFAST_ORIGIN = window.location.origin;
-const GET_TRACE_URL = BRFAST_ORIGIN + '/get-trace';
+const GET_EXPLORED_ATTRIBUTE_SETS_URL = BRFAST_ORIGIN + '/get-explored-attribute-sets';
 const ATTRIBUTE_SET_URL = BRFAST_ORIGIN + '/attribute-set';
 
 // The nodes and links which are updated through time
 var nodes = [], links = [];
 
 // A dictionary mapping the attributes set (list of attributes) to their ids
-var attributesToNodeId = {};
+const attributesToNodeId = {};
 attributesToNodeId[EMPTY_NODE.attributes] = EMPTY_NODE.id;
 
 // The attribute set composed of the candidate attributes (i.e., all of them)
-var candidateAttributes, costDimensions = undefined, undefined;
+var candidateAttributes = undefined, costDimensions = undefined;
 
 // The best solution currently found
 var bestSolution = undefined, lowestUsabilityCost = Infinity;
@@ -131,9 +119,9 @@ function updateNodesAndLinks(newNodes) {
     .enter()
     .append('line')
     .lower()
-    .attr('stroke-width', 2)
-    .attr('stroke-opacity', 0.7)
-    .style('stroke', 'grey');
+    .attr('stroke-width', LINK_WIDTH)
+    .attr('stroke-opacity', LINK_OPACITY)
+    .style('stroke', LINK_COLOUR);
 
   // Draw the circles of the nodes
   const node = g.append('g')
@@ -142,7 +130,7 @@ function updateNodesAndLinks(newNodes) {
     .data(nodes)
     .enter()
     .append('circle')
-    .attr('r', 7)
+    .attr('r', NODE_RADIUS)
     .attr('fill', circleColour)
     .on('click', nodeClickAction)
     .on('mouseenter', nodeMouseEnterAction)
@@ -159,7 +147,7 @@ function updateNodesAndLinks(newNodes) {
   simulation.force('charge_force', d3.forceManyBody())
             .force('center_force', d3.forceCenter(width / 2, height / 2))
             .force('collision', d3.forceCollide(function(node) {
-              return node.radius*2;
+              return node.radius*NODE_COLLISION_RADIUS_MULTIPLICATOR;
             }))
             .force('links', linkForce);
 
@@ -327,23 +315,23 @@ function nodeMouseLeaveAction() {
 function circleColour(node) {
   switch (node.state) {
     case ATTRIBUTE_SET_STATE.EXPLORED:  // Explored
-      return 'blue';
+      return COLOUR_EXPLORED_NODE;
 
     case ATTRIBUTE_SET_STATE.PRUNED:  // Pruned
-      return 'orange';
+      return COLOUR_PRUNED_NODE;
 
     case ATTRIBUTE_SET_STATE.SATISFYING:  // Satisfying the sensitivity
       // The best solution is in red
       if (bestSolution && node.id == bestSolution.id)
-        return 'red';
-      return 'green';
+        return COLOUR_BEST_SOLUTION;
+      return COLOUR_SATISFYING_SENSITIVITY;
 
     case ATTRIBUTE_SET_STATE.EMPTY_NODE:  // The empty node
-      return 'cyan';
+      return COLOUR_EMPTY_NODE;
 
     default:  // Otherwise, just colour as explored
       console.warn('Unknown node state: ' + node.state);
-      return 'blue';
+      return COLOUR_DEFAULT;
   }
 }
 
@@ -432,17 +420,25 @@ function removeMissingLinks(links, nodes) {
 function getAndUpdateNodes() {
   // Build and execute the GET request
   let xhr = new XMLHttpRequest();
-  const url = GET_TRACE_URL + '/' + nextNodeId + '/' + (nextNodeId+STEP);
-  console.log('Getting ' + url);
+  const url = GET_EXPLORED_ATTRIBUTE_SETS_URL + '/' + nextNodeId + '/' + (nextNodeId+STEP);
+  // console.log('Getting ' + url);
   xhr.open('GET', url, true); // true for asynchronous request
 
   xhr.onload = function (e) {
     if (xhr.readyState === 4) {
       if (xhr.status === 200) {
-        if (xhr.responseText != '[]') {
-          updateFromJsonResponse(xhr.responseText);
-          nextNodeId = nextNodeId + STEP + 1;
+        const response = JSON.parse(xhr.responseText);
+        updateFromJsonResponse(response.explored_attribute_sets);
+        if (response.remaining) {
+          const nbReceived = response.explored_attribute_sets.length;
+          nextNodeId = nextNodeId + nbReceived;
           setTimeout(getAndUpdateNodes, COLLECT_FREQUENCY);
+        } else {
+          // The exploration is done, we remove the ongoing exploration spinner
+          $('#ongoing-exploration-spinner').remove();
+
+          // And display the button to download the resulting trace
+          setVisibleState($('#download-trace-button'), true);
         }
       } else {
         console.error(xhr.statusText);
@@ -458,12 +454,9 @@ function getAndUpdateNodes() {
 
 /**
  * Update the nodes and links from a json response.
- * @param jsonResponse The json response.
+ * @param newNodes The new nodes (= explored attribute sets) to add.
  */
-function updateFromJsonResponse(jsonResponse) {
-  // Parse the response to generate the object containing the new nodes
-  const newNodes = JSON.parse(jsonResponse);
-
+function updateFromJsonResponse(newNodes) {
   // For each new node, add it to the dictionary mapping the attributes to the
   // id of the attribute sets (which are the nodes)
   let i = newNodes.length;
@@ -564,7 +557,7 @@ function initializeExplorationState(firstNewNodes) {
       $('#exploration-state-table').append('<tr><th scope="row">Best ' + costDimension + ' cost</th><td id="best-cost-dimension-' + costDimension + '">...</td></tr>');
       const progressBarClass = PROGRESS_BAR_CLASSES[j%PROGRESS_BAR_CLASSES.length];
       const costDimUppercase = costDimension.charAt(0).toUpperCase() + costDimension.slice(1);
-      $('#usability-cost-progress-bars').append('<div>' + costDimUppercase + ' cost<div class="progress"><div class="progress-bar bg-' + progressBarClass + '" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" id="cost-progress-bar-' + costDimension + '">100%</div></div></div>');
+      $('#usability-cost-progress-bars').append('<div>' + costDimUppercase + ' cost<div class="progress"><div class="progress-bar ' + progressBarClass + '" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" id="cost-progress-bar-' + costDimension + '">100%</div></div></div>');
 
       // Also add this cost dimension to the empty node
       EMPTY_NODE.cost_explanation[costDimension] = 0.0;

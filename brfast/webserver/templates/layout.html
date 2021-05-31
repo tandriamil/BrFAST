@@ -86,6 +86,62 @@
     <!-- Bootstrap Bundle with Popper -->
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
 
+    <!-- Parameters -->
+    {% if javascript_parameters %}
+    <script type="text/javascript">
+      // The precision of the floating point numbers shown
+      const FLOAT_PRECISION = {{ javascript_parameters.get('VisualizationParameters', 'float_precision') }};
+
+      // The classes for the progress bars
+      const PROGRESS_BAR_CLASSES = [
+        {% for progress_bar_class in javascript_parameters.get('WebServer', 'bootstrap_progess_bars').splitlines() %}
+          "{{ progress_bar_class }}",
+        {% endfor %}
+      ];
+
+      // We limit the number of displayed nodes for performance reasons
+      const NODES_LIMIT = {{ javascript_parameters.get('VisualizationParameters', 'nodes_limit') }};
+
+      /**
+       * The STEP (i.e., how many attribute sets are collected every x
+       * seconds), and the collect frequency (i.e., the time in
+       * milliseconds after which we collect the next attribute sets)
+       */
+      const STEP = {{ javascript_parameters.get('VisualizationParameters', 'collected_nodes_step') }};
+      const COLLECT_FREQUENCY = {{ javascript_parameters.get('VisualizationParameters', 'collect_frequency') }};
+
+      // The colour of the nodes given their state
+      const COLOUR_EXPLORED_NODE = "{{ javascript_parameters.get('NodeColour', 'explored') }}";
+      const COLOUR_PRUNED_NODE = "{{ javascript_parameters.get('NodeColour', 'pruned') }}";
+      const COLOUR_BEST_SOLUTION = "{{ javascript_parameters.get('NodeColour', 'best_solution') }}";
+      const COLOUR_SATISFYING_SENSITIVITY = "{{ javascript_parameters.get('NodeColour', 'satisfying_sensitivity') }}";
+      const COLOUR_EMPTY_NODE = "{{ javascript_parameters.get('NodeColour', 'empty_node') }}";
+      const COLOUR_DEFAULT = "{{ javascript_parameters.get('NodeColour', 'default') }}";
+
+      // The graphical parameters of the links and the nodes
+      const LINK_WIDTH = {{ javascript_parameters.get('VisualizationParameters', 'link_width') }};
+      const LINK_OPACITY = {{ javascript_parameters.get('VisualizationParameters', 'link_opacity') }};
+      const LINK_COLOUR = "{{ javascript_parameters.get('VisualizationParameters', 'link_colour') }}";
+      const NODE_RADIUS = {{ javascript_parameters.get('VisualizationParameters', 'node_radius') }};
+      const NODE_COLLISION_RADIUS_MULTIPLICATOR = {{ javascript_parameters.get('VisualizationParameters', 'node_collision_radius_multiplicator') }};
+
+      /**
+       * An utility function to set the visibility state of an element.
+       * @param element The element for which to set the visibility state.
+       * @param visibile Whether this element should be visible or not.
+       */
+      function setVisibleState(element, visible) {
+        if (visible) {
+          element.addClass('visible');
+          element.removeClass('invisible');
+        } else {
+          element.addClass('invisible');
+          element.removeClass('visible');
+        }
+      }
+    </script>
+    {% endif %}
+
     {% block js_libraries %}
     {% endblock %}
     <!-- ####################### End of JS libraries ####################### -->

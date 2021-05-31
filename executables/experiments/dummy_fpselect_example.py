@@ -3,16 +3,16 @@
 
 import importlib
 
-from brfast.data import (Attribute, AttributeSet, FingerprintDataset,
-                         MetadataField)
+from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.dataset import FingerprintDataset, MetadataField
 from brfast.exploration.conditional_entropy import ConditionalEntropy
 from brfast.exploration.entropy import Entropy
 from brfast.exploration.fpselect import FPSelect
 from brfast.measures import UsabilityCostMeasure, SensitivityMeasure
 
 # Import the engine of the analysis module (pandas or modin)
-from brfast import config
-pd = importlib.import_module(config['DataAnalysis']['engine'])
+from brfast.config import params
+pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 
 # The parameters of the three exploration methods that are tested

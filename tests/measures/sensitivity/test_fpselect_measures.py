@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Test module of the brfast.measures.sensitivity.fp_select_measures module."""
+"""Test module of the brfast.measures.sensitivity.fpselect module."""
 
 import importlib
 import unittest
@@ -7,17 +7,19 @@ import unittest
 import pandas as pd
 from pandas.testing import assert_frame_equal  # To test DataFrame objects
 
-from brfast.data import MetadataField
+from brfast.data.attribute import AttributeSet
+from brfast.data.dataset import MetadataField
 from brfast.measures.sensitivity.fpselect import (
-    _get_top_k_fingerprints, _preprocess_one_fp_per_browser, PROPORTION_FIELD)
+    _get_top_k_fingerprints, TopKFingerprints, PROPORTION_FIELD)
 
-from tests.data import ATTRIBUTES, DummyCleanDataset, DummyFingerprintDataset
+from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
+                        DummyFingerprintDataset)
 
 # Import the engine of the analysis module (pandas or modin)
-from brfast import config
+from brfast.config import params
 
 
-class TestGetTopKFingerprints(unittest.TestCase):
+class TestGetTopKFingerprintsFunction(unittest.TestCase):
 
     def setUp(self):
         self._dataset = DummyCleanDataset()
@@ -31,10 +33,16 @@ class TestGetTopKFingerprints(unittest.TestCase):
         expected_dataframe = pd.DataFrame(expected_data)
         resulting_dataframe = _get_top_k_fingerprints(
             self._dataset.dataframe, self._attribute_names, 0)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
+        if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe,
-                           check_dtype=False, check_index_type=False)
+
+        # Put back the right type as we started from an empty list of values
+        for attribute in self._attribute_names:
+            source_type = self._dataset.dataframe.dtypes[attribute]
+            expected_dataframe[attribute] = expected_dataframe[
+                attribute].astype(source_type)
+
+        assert_frame_equal(resulting_dataframe, expected_dataframe)
 
     def test_top_1_fingerprint(self):
         # Rows seem to be sorted : (Chrome, 100, 1) is then first...
@@ -45,10 +53,9 @@ class TestGetTopKFingerprints(unittest.TestCase):
         expected_dataframe = pd.DataFrame(expected_data)
         resulting_dataframe = _get_top_k_fingerprints(
             self._dataset.dataframe, self._attribute_names, 1)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
+        if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe,
-                           check_dtype=False, check_index_type=False)
+        assert_frame_equal(resulting_dataframe, expected_dataframe)
 
     def test_top_3_fingerprints_non_uniques(self):
         # Rows seem to be sorted : (Chrome, 1) is then before (Edge, 1)
@@ -62,10 +69,9 @@ class TestGetTopKFingerprints(unittest.TestCase):
         expected_dataframe = pd.DataFrame(expected_data)
         resulting_dataframe = _get_top_k_fingerprints(
             self._dataset.dataframe, attribute_names, 3)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
+        if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe,
-                           check_dtype=False, check_index_type=False)
+        assert_frame_equal(resulting_dataframe, expected_dataframe)
 
     def test_top_42_fingerprints_non_uniques(self):
         # Rows seem to be sorted : (Chrome, 1) is then before (Edge, 1)
@@ -79,91 +85,140 @@ class TestGetTopKFingerprints(unittest.TestCase):
         expected_dataframe = pd.DataFrame(expected_data)
         resulting_dataframe = _get_top_k_fingerprints(
             self._dataset.dataframe, attribute_names, 42)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
+        if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe,
-                           check_dtype=False, check_index_type=False)
+        assert_frame_equal(resulting_dataframe, expected_dataframe)
 
 
-class TestPreprocessOneFpPerBrowser(unittest.TestCase):
+class TopKFingerprintsCleanDataset(unittest.TestCase):
+
+    def setUp(self):
+        self._dataset = DummyCleanDataset()
+        self._attribute_set = AttributeSet(ATTRIBUTES)
+        self._candidate_attributes = AttributeSet(ATTRIBUTES)
+        self._most_common_fps = 3
+
+    def test_repr(self):
+        top_k_fingerprints = TopKFingerprints(self._dataset,
+                                              self._most_common_fps)
+        self.assertIsInstance(repr(top_k_fingerprints), str)
+
+    def check_top_k_fingerprints(self, expected_nb_browsers: int):
+        top_k_fingerprints = TopKFingerprints(self._dataset,
+                                              self._most_common_fps)
+        result = top_k_fingerprints.evaluate(self._attribute_set)
+        self.assertAlmostEqual(result, expected_nb_browsers)
+
+    def test_top_0_fingerprints(self):
+        self._most_common_fps = 0
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(0.0)
+
+    def test_top_1_fingerprints(self):
+        self._most_common_fps = 1
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 2/5, ATTRIBUTES[1]: 1/5,
+                                   ATTRIBUTES[2]: 5/5}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_2_fingerprints(self):
+        self._most_common_fps = 2
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 4/5, ATTRIBUTES[1]: 2/5,
+                                   ATTRIBUTES[2]: 5/5}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_3_fingerprints(self):
+        self._most_common_fps = 3
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 5/5, ATTRIBUTES[1]: 3/5,
+                                   ATTRIBUTES[2]: 5/5}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_4_fingerprints(self):
+        self._most_common_fps = 4
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 5/5, ATTRIBUTES[1]: 4/5,
+                                   ATTRIBUTES[2]: 5/5}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_5_fingerprints(self):
+        self._most_common_fps = 5
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 5/5, ATTRIBUTES[1]: 5/5,
+                                   ATTRIBUTES[2]: 5/5}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_42_fingerprints(self):
+        self._most_common_fps = 42
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 5/5, ATTRIBUTES[1]: 5/5,
+                                   ATTRIBUTES[2]: 5/5}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+
+class TopKFingerprintsUncleanDataset(TopKFingerprintsCleanDataset):
 
     def setUp(self):
         self._dataset = DummyFingerprintDataset()
+        self._attribute_set = AttributeSet(ATTRIBUTES)
+        self._candidate_attributes = AttributeSet(ATTRIBUTES)
+        self._most_common_fps = 3
 
-    def test_last_fingerprint_equivalent_to_descending(self):
-        expected_data = {
-            MetadataField.BROWSER_ID: [1, 2, 3],
-            MetadataField.TIME_OF_COLLECT: [
-                pd.to_datetime('2021-03-12 00:00:00'),
-                pd.to_datetime('2021-03-12 03:00:00'),
-                pd.to_datetime('2021-03-12 04:00:00')],
-            ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge'],
-            ATTRIBUTES[1].name: [60, 120, 90],
-            ATTRIBUTES[2].name: [1, 1, 1]
-        }
-        expected_dataframe = pd.DataFrame(expected_data)
-        expected_dataframe.set_index(
-            [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
-            inplace=True)
-        resulting_dataframe = _preprocess_one_fp_per_browser(
-            self._dataset.dataframe)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
-            resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+    def test_top_1_fingerprints(self):
+        self._most_common_fps = 1
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 1/3, ATTRIBUTES[1]: 1/3,
+                                   ATTRIBUTES[2]: 3/3}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
 
-    def test_first_fingerprint_equivalent_to_ascending(self):
-        expected_data = {
-            MetadataField.BROWSER_ID: [1, 2, 3],
-            MetadataField.TIME_OF_COLLECT: [
-                pd.to_datetime('2021-03-12 00:00:00'),
-                pd.to_datetime('2021-03-12 01:00:00'),
-                pd.to_datetime('2021-03-12 02:00:00')],
-            ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge'],
-            ATTRIBUTES[1].name: [60, 120, 90],
-            ATTRIBUTES[2].name: [1, 1, 1]
-        }
-        expected_dataframe = pd.DataFrame(expected_data)
-        expected_dataframe.set_index(
-            [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
-            inplace=True)
-        resulting_dataframe = _preprocess_one_fp_per_browser(
-            self._dataset.dataframe, last_fingerprint=False)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
-            resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+    def test_top_2_fingerprints(self):
+        self._most_common_fps = 2
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 2/3, ATTRIBUTES[1]: 2/3,
+                                   ATTRIBUTES[2]: 3/3}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
 
-    def test_empty_dataset(self):
-        data = {
-            MetadataField.BROWSER_ID: [],
-            MetadataField.TIME_OF_COLLECT: []
-        }
-        dataframe = pd.DataFrame(data)
-        dataframe.set_index(
-            [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
-            inplace=True)
-        ascending_result_dataframe = _preprocess_one_fp_per_browser(
-            dataframe, last_fingerprint=False)
-        descending_result_dataframe = _preprocess_one_fp_per_browser(dataframe)
-        # No need to check for modin.pandas DataFrame as the same empty
-        # DataFrame will be returned
-        assert_frame_equal(ascending_result_dataframe, dataframe)
-        assert_frame_equal(descending_result_dataframe, dataframe)
+    def test_top_3_fingerprints(self):
+        self._most_common_fps = 3
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 3/3, ATTRIBUTES[1]: 3/3,
+                                   ATTRIBUTES[2]: 3/3}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
 
-    def test_dataset_already_clean(self):
-        clean_dataset = DummyCleanDataset()
-        clean_dataframe = clean_dataset.dataframe
-        ascending_result_dataframe = _preprocess_one_fp_per_browser(
-            clean_dataset.dataframe, last_fingerprint=False)
-        descending_result_dataframe = _preprocess_one_fp_per_browser(
-            clean_dataset.dataframe)
-        if config['DataAnalysis']['engine'] == 'modin.pandas':
-            clean_dataframe = clean_dataframe._to_pandas()
-            ascending_result_dataframe = (
-                ascending_result_dataframe._to_pandas())
-            descending_result_dataframe = (
-                descending_result_dataframe._to_pandas())
-        assert_frame_equal(ascending_result_dataframe, clean_dataframe)
-        assert_frame_equal(descending_result_dataframe, clean_dataframe)
+    def test_top_4_fingerprints(self):
+        self._most_common_fps = 4
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 3/3, ATTRIBUTES[1]: 3/3,
+                                   ATTRIBUTES[2]: 3/3}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_5_fingerprints(self):
+        self._most_common_fps = 5
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 3/3, ATTRIBUTES[1]: 3/3,
+                                   ATTRIBUTES[2]: 3/3}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
+
+    def test_top_42_fingerprints(self):
+        self._most_common_fps = 42
+        top_k_fps_per_attribute = {ATTRIBUTES[0]: 3/3, ATTRIBUTES[1]: 3/3,
+                                   ATTRIBUTES[2]: 3/3}
+        for attribute in self._candidate_attributes:
+            self._attribute_set = AttributeSet([attribute])
+            self.check_top_k_fingerprints(top_k_fps_per_attribute[attribute])
 
 
 if __name__ == '__main__':

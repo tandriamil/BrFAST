@@ -4,9 +4,6 @@
 
 // ##### Variables and parameters
 
-// The precision of the floating point numbers shown
-const FLOAT_PRECISION = 3;
-
 // The origin of the website and the URL for the /get-trace GET request
 const BRFAST_ORIGIN = window.location.origin;
 const ENTROPY_RESULT_URL = BRFAST_ORIGIN + '/attribute-set-entropy';
@@ -29,6 +26,7 @@ function getEntropyResults() {
     if (xhr.readyState === 4) {
       if (xhr.status === 200) {
         setEntropyResults(xhr.responseText);
+        getUnicityResults();
       } else {
         console.error(xhr.statusText);
       }
@@ -97,4 +95,8 @@ function setUnicityResults(jsonResponse) {
 
 // ##### Main execution of this script
 getEntropyResults();
-getUnicityResults();
+
+// NOTE Update: We will now get the unicity result after getting the entropy
+//      result in a sequential manner to let the preprocessing of the dataset
+//      take place.
+// getUnicityResults();

@@ -2,65 +2,18 @@
 """Module containing the interfaces of the exploration classes."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import IntEnum
-from typing import Any, Dict, List, Set
+from multiprocessing import Manager, Process
+from typing import Any, Dict, List, Optional, Set
 
 from loguru import logger
 from sortedcontainers import SortedDict, SortedList
 
-from brfast import config
+from brfast.config import ANALYSIS_ENGINES, params
+from brfast.data.attribute import AttributeSet
+from brfast.data.dataset import FingerprintDataset
 from brfast.measures import SensitivityMeasure, UsabilityCostMeasure
-from brfast.data import AttributeSet, FingerprintDataset
-
-
-class State(IntEnum):
-    """The states of an explored attribute set."""
-
-    EXPLORED = 1
-    PRUNED = 2
-    SATISFYING = 3
-    EMPTY_NODE = 4
-
-
-class TraceData:
-    """Class representing the data stored in the trace."""
-
-    # About the exploration
-    EXPLORATION = 'exploration'
-    PARAMETERS = 'parameters'
-    RESULT = 'result'
-    SATISFYING_ATTRIBUTES = 'satisfying_attributes'
-    SOLUTION = 'solution'
-    START_TIME = 'start_time'
-
-    # About an explored attribute set
-    ATTRIBUTE_SET_ID = 'id'
-    ATTRIBUTES = 'attributes'
-    COST_EXPLANATION = 'cost_explanation'
-    SENSITIVITY = 'sensitivity'
-    STATE = 'state'
-    TIME = 'time'
-    USABILITY_COST = 'usability_cost'
-
-
-class ExplorationParameters:
-    """Class representing the default parameters of an exploration."""
-
-    DATASET = 'dataset'
-    METHOD = 'method'
-    SENSITIVITY_MEASURE = 'sensitivity_measure'
-    SENSITIVITY_THRESHOLD = 'sensitivity_threshold'
-    USABILITY_COST_MEASURE = 'usability_cost_measure'
-    ANALYSIS_ENGINE = 'analysis_engine'
-
-
-class ExplorationNotRun(Exception):
-    """Exception raised when accessing an attribute before the exploration."""
-
-
-class SensitivityThresholdUnreachable(Exception):
-    """Exception raised when the sensitivity threshold is unreachable."""
 
 
 class Exploration:
@@ -81,12 +34,19 @@ class Exploration:
         self._usability_cost = usability_cost_measure
         self._dataset = dataset
         self._sensitivity_threshold = sensitivity_threshold
-        # The attributes to update during the exploration
-        self._solution, self._satisfying_attribute_sets = None, set()
-        self._explored_attr_sets = []
+
+        # Create a manager to have a shared memory between the processes
+        self._manager = Manager()
+
+        # The attributes that are shared between the processes and that should
+        # be updated during the exploration
+        self._solution = self._manager.list([None])
+        self._satisfying_attribute_sets = self._manager.list()
+        self._explored_attr_sets = self._manager.list()
+
+        # The start time and the max cost will be set during the exploration
+        self._start_time, self._execution_time = None, None
         self._max_cost = float('inf')
-        # The start time will be set when running the exploration
-        self._start_time = None
 
         # Some info/debug messages
         candidate_attributes = self._dataset.candidate_attributes
@@ -118,17 +78,21 @@ class Exploration:
             SensitivityThresholdUnreachable: The sensitivity threshold is
                                              unreachable.
         """
-        logger.info('Start running the exploration...')
+        logger.info('Start running the exploration in sequential manner...')
 
         # Hold the start time to measure the time taken by each measure
         self._start_time = datetime.now()
+        logger.debug(f'Starting the exploration at {self._start_time}.')
 
         # Then, check that the sensitivity threshold is reachable
         if not self._is_sensitivity_threshold_reachable():
-            raise SensitivityThresholdUnreachable(
-                'The sensitivity threshold is not reachable even using all the'
-                f' {len(self._dataset.candidate_attributes)} candidate '
+            warning_message = (
+                f'The sensivity threshold of {self._sensitivity_threshold} '
+                'is not reachable even using all the '
+                f'{len(self._dataset.candidate_attributes)} candidate '
                 'attributes.')
+            logger.warning(warning_message)
+            raise SensitivityThresholdUnreachable(warning_message)
 
         # If a solution exists, search for a solution
         logger.info('The sensitivity threshold is reachable, searching for a '
@@ -136,8 +100,49 @@ class Exploration:
         self._search_for_solution()
 
         # A little message when the exploration is done
-        diff_w_start_time = datetime.now() - self._start_time
-        logger.info(f'The exploration is done after {diff_w_start_time}.')
+        self._execution_time = datetime.now() - self._start_time
+        logger.info(f'The exploration is done after {self._execution_time}.')
+        logger.info(f'{len(self._explored_attr_sets)} attribute sets were '
+                    'explored, among which '
+                    f'{len(self._satisfying_attribute_sets)} satisfy the '
+                    'sensitivity threshold.')
+
+    def run_asynchronous(self) -> Process:
+        """Run the search for a solution in an asynchronous manner.
+
+        Returns:
+            The process that runs the search for a solution.
+        """
+        logger.info('Start running the exploration in asynchronous manner...')
+
+        # Hold the start time to measure the time taken by each measure
+        self._start_time = datetime.now()
+        logger.debug(f'Starting the exploration at {self._start_time}.')
+
+        # Create, start, and return a process that runs the exploration
+        process = Process(target=self._asynchronous_execution)
+        process.start()
+        return process
+
+    def _asynchronous_execution(self):
+        """Run the exploration in another process."""
+        # Then, check that the sensitivity threshold is reachable
+        if not self._is_sensitivity_threshold_reachable():
+            logger.warning(
+                f'The sensivity threshold of {self._sensitivity_threshold} '
+                'is not reachable even using all the '
+                f'{len(self._dataset.candidate_attributes)} candidate '
+                'attributes.')
+            return
+
+        # If a solution exists, search for a solution
+        logger.info('The sensitivity threshold is reachable, searching for'
+                    ' a solution now...')
+        self._search_for_solution()
+
+        # A little message when the exploration is done
+        self._execution_time = datetime.now() - self._start_time
+        logger.info(f'The exploration is done after {self._execution_time}.')
         logger.info(f'{len(self._explored_attr_sets)} attribute sets were '
                     'explored, among which '
                     f'{len(self._satisfying_attribute_sets)} satisfy the '
@@ -181,7 +186,7 @@ class Exploration:
         subsets will show a higher sensitivity.
 
         Returns:
-            If the sensitivity threshold is reachable.
+            Whether the sensitivity threshold is reachable.
         """
         logger.info('Checking if the sensitivity threshold of '
                     f'{self._sensitivity_threshold} is reachable when using '
@@ -205,14 +210,14 @@ class Exploration:
             sensitivity_canditate_attributes <= self._sensitivity_threshold)
         if min_sensitivity_satisfies_threshold:
             candidate_attributes_state = State.SATISFYING
-            self._satisfying_attribute_sets.add(
+            self._add_satisfying_attribute_set(
                 self._dataset.candidate_attributes)
         else:
             candidate_attributes_state = State.EXPLORED
 
         # Store this attribute set in the explored sets
         compute_time = str(datetime.now() - self._start_time)
-        self._explored_attr_sets.append({
+        self._add_explored_attribute_set({
             TraceData.TIME: compute_time,
             TraceData.ATTRIBUTES: (
                 self._dataset.candidate_attributes.attribute_ids),
@@ -231,9 +236,10 @@ class Exploration:
         Returns:
             A dictionary with the default parameters of an exploration.
         """
-        analysis_engine = config['DataAnalysis']['engine']
-        if analysis_engine == 'modin.pandas':
-            analysis_engine += f"[{config['DataAnalysis']['modin_engine']}]"
+        analysis_engine = params.get('DataAnalysis', 'engine')
+        if analysis_engine == ANALYSIS_ENGINES[1]:
+            modin_engine = params.get('DataAnalysis', 'modin_engine')
+            analysis_engine += f"[{modin_engine}]"
         return {
             ExplorationParameters.METHOD: self.__class__.__name__,
             ExplorationParameters.SENSITIVITY_MEASURE: str(self._sensitivity),
@@ -242,7 +248,11 @@ class Exploration:
             ExplorationParameters.DATASET: str(self._dataset),
             ExplorationParameters.SENSITIVITY_THRESHOLD: (
                 self._sensitivity_threshold),
-            ExplorationParameters.ANALYSIS_ENGINE: analysis_engine
+            ExplorationParameters.ANALYSIS_ENGINE: analysis_engine,
+            ExplorationParameters.MULTIPROCESSING: params.getboolean(
+                'Multiprocessing', 'explorations'),
+            ExplorationParameters.FREE_CORES: params.getint('Multiprocessing',
+                                                            'free_cores')
         }
 
     @property
@@ -254,6 +264,25 @@ class Exploration:
         """
         return self._default_parameters()
 
+    def _check_exploration_state(self):
+        """Check the exploration state before providing results.
+
+        Raises:
+            ExplorationNotRun: The exploration was not run.
+            SensitivityThresholdUnreachable: In asynchronous run: the
+                                             sensitivity threshold is
+                                             unreachable.
+        """
+        if not self._start_time:
+            raise ExplorationNotRun('The exploration was not run.')
+
+        # If the run was launched, some attribute sets were explored but no
+        # attribute sets satisfy the sensitivity threshold, this means that the
+        # complete set of attributes does not satisfy the sensitivity threshold
+        if not self._satisfying_attribute_sets and self._explored_attr_sets:
+            raise SensitivityThresholdUnreachable(
+                'The sensitivity is unreachable (asynchronous run).')
+
     def get_solution(self) -> AttributeSet:
         """Provide the solution found by the algorithm after the exploration.
 
@@ -264,10 +293,24 @@ class Exploration:
 
         Raises:
             ExplorationNotRun: The exploration was not run.
+            SensitivityThresholdUnreachable: In asynchronous run: the
+                                             sensitivity threshold is
+                                             unreachable.
         """
-        if not self._start_time:
-            raise ExplorationNotRun('The exploration was not run.')
-        return self._solution
+        self._check_exploration_state()
+        # Create a new AttributeSet to exit the shared memory space
+        return AttributeSet(self._solution[0])
+
+    def _update_solution(self, new_solution: AttributeSet):
+        """Update the best solution currently found.
+
+        This solution is the attribute set that satisfies the sensitivity
+        threshold at the lowest cost.
+
+        Args:
+            new_solution: The new solution found.
+        """
+        self._solution[0] = new_solution
 
     def get_satisfying_attribute_sets(self) -> Set[AttributeSet]:
         """Provide the attribute sets that satisfy the sensitivity threshold.
@@ -279,13 +322,31 @@ class Exploration:
 
         Raises:
             ExplorationNotRun: The exploration was not run.
+            SensitivityThresholdUnreachable: In asynchronous run: the
+                                             sensitivity threshold is
+                                             unreachable.
         """
-        if not self._start_time:
-            raise ExplorationNotRun('The exploration was not run.')
-        return self._satisfying_attribute_sets
+        self._check_exploration_state()
+        # Generate a set and exit the shared memory space
+        return set(self._satisfying_attribute_sets)
 
-    def get_explored_attribute_sets(self) -> List[AttributeSet]:
+    def _add_satisfying_attribute_set(self, new_attribute_set: AttributeSet):
+        """Add a new attribute set that satisfies the sensitivity threshold.
+
+        Args:
+            new_attribute_set: The new attribute set that satisfies the
+                               sensitivity threshold.
+        """
+        self._satisfying_attribute_sets.append(new_attribute_set)
+
+    def get_explored_attribute_sets(self, start_id: Optional[int] = None,
+                                    end_id: Optional[int] = None
+                                    ) -> List[AttributeSet]:
         """Provide the attribute sets that were explored.
+
+        Args:
+            start_id: The starting id of the sublist to consider.
+            end_id: The ending id of the sublist to consider.
 
         Returns:
             The AttributeSet that were explored in the order of exploration.
@@ -295,7 +356,38 @@ class Exploration:
         """
         if not self._start_time:
             raise ExplorationNotRun('The exploration was not run.')
-        return self._explored_attr_sets
+
+        # Create a new list to exit the shared memory space
+        if start_id is None:
+            start_id = 0
+        if end_id is None:
+            return list(self._explored_attr_sets[start_id:])
+        return list(self._explored_attr_sets[start_id:end_id])
+
+    def _add_explored_attribute_set(self, new_attribute_set: AttributeSet):
+        """Add a new attribute set that was explored.
+
+        Args:
+            new_attribute_set: The new attribute set that satisfies the
+                               sensitivity threshold.
+        """
+        self._explored_attr_sets.append(new_attribute_set)
+
+    def get_execution_time(self) -> Optional[timedelta]:
+        """Provide the execution time of the exploration.
+
+        Returns:
+            The execution time of the exploration as a timedelta. None if the
+            exploration is still ongoing.
+
+        Raises:
+            ExplorationNotRun: The exploration was not run.
+            SensitivityThresholdUnreachable: In asynchronous run: the
+                                             sensitivity threshold is
+                                             unreachable.
+        """
+        self._check_exploration_state()
+        return self._execution_time
 
     def save_exploration_trace(self, save_path: str):
         """Save the trace registered during the exploration as a json file.
@@ -305,9 +397,11 @@ class Exploration:
 
         Raises:
             ExplorationNotRun: The exploration was not run.
+            SensitivityThresholdUnreachable: In asynchronous run: the
+                                             sensitivity threshold is
+                                             unreachable.
         """
-        if not self._start_time:
-            raise ExplorationNotRun('The exploration was not run.')
+        self._check_exploration_state()
         logger.info(f'Saving the exploration trace to {save_path}...')
 
         # The json dictionary to save (as a python dict)
@@ -319,23 +413,27 @@ class Exploration:
         # Information about the attributes
         json_output[TraceData.ATTRIBUTES] = SortedDict()
         for attribute in self._dataset.candidate_attributes:
-            json_output[TraceData.ATTRIBUTES][attribute.attr_id] = (
+            json_output[TraceData.ATTRIBUTES][attribute.attribute_id] = (
                 attribute.name)
+
+        # The ids of the satisfying attributes
+        satisfying_attributes_id = [
+            [attribute.attribute_id for attribute in satisfying_attr_set]
+            for satisfying_attr_set in self.get_satisfying_attribute_sets()]
 
         # Information about the results
         result = {
-            TraceData.SOLUTION: [attribute.attr_id
-                                 for attribute in self._solution],
-            TraceData.SATISFYING_ATTRIBUTES: [
-                [attribute.attr_id for attribute in satisfying_attr_set]
-                for satisfying_attr_set in self._satisfying_attribute_sets],
+            TraceData.SOLUTION: [attribute.attribute_id
+                                 for attribute in self.get_solution()],
+            TraceData.SATISFYING_ATTRIBUTES: satisfying_attributes_id,
             TraceData.START_TIME: str(self._start_time)
         }
         json_output[TraceData.RESULT] = result
 
         # Information about the actual exploration
         json_output[TraceData.EXPLORATION] = []
-        for i, explr_set_information in enumerate(self._explored_attr_sets):
+        explored_attribute_sets = self.get_explored_attribute_sets()
+        for i, explr_set_information in enumerate(explored_attribute_sets):
             explr_set_information[TraceData.ATTRIBUTE_SET_ID] = i
             json_output[TraceData.EXPLORATION].append(explr_set_information)
 
@@ -344,3 +442,56 @@ class Exploration:
             json.dump(json_output, save_file)
 
         logger.info(f'The exploration is saved at {save_path}.')
+
+
+# ============================== Utility Classes ==============================
+class State(IntEnum):
+    """The states of an explored attribute set."""
+
+    EXPLORED = 1
+    PRUNED = 2
+    SATISFYING = 3
+    EMPTY_NODE = 4
+
+
+class TraceData:
+    """Class representing the data stored in the trace."""
+
+    # About the exploration
+    EXPLORATION = 'exploration'
+    PARAMETERS = 'parameters'
+    RESULT = 'result'
+    SATISFYING_ATTRIBUTES = 'satisfying_attributes'
+    SOLUTION = 'solution'
+    START_TIME = 'start_time'
+
+    # About an explored attribute set
+    ATTRIBUTE_SET_ID = 'id'
+    ATTRIBUTES = 'attributes'
+    COST_EXPLANATION = 'cost_explanation'
+    SENSITIVITY = 'sensitivity'
+    STATE = 'state'
+    TIME = 'time'
+    USABILITY_COST = 'usability_cost'
+
+
+class ExplorationParameters:
+    """Class representing the default parameters of an exploration."""
+
+    DATASET = 'dataset'
+    METHOD = 'method'
+    SENSITIVITY_MEASURE = 'sensitivity_measure'
+    SENSITIVITY_THRESHOLD = 'sensitivity_threshold'
+    USABILITY_COST_MEASURE = 'usability_cost_measure'
+    ANALYSIS_ENGINE = 'analysis_engine'
+    MULTIPROCESSING = 'multiprocessing'
+    FREE_CORES = 'free_cores'
+
+
+class ExplorationNotRun(Exception):
+    """Exception raised when accessing an attribute before the exploration."""
+
+
+class SensitivityThresholdUnreachable(Exception):
+    """Exception raised when the sensitivity threshold is unreachable."""
+# =========================== End of Utility Classes ==========================

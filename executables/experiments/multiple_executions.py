@@ -16,7 +16,8 @@ from typing import Dict
 
 from loguru import logger
 
-from brfast.data import FingerprintDataset, FingerprintDatasetFromCSVFile
+from brfast.data.dataset import (FingerprintDataset,
+                                 FingerprintDatasetFromCSVFile)
 from brfast.exploration import SensitivityThresholdUnreachable
 from brfast.exploration.conditional_entropy import ConditionalEntropy
 from brfast.exploration.entropy import Entropy
@@ -27,9 +28,9 @@ from brfast.measures.usability_cost.fpselect import (
     CostDimension, MemoryInstability)
 
 # Import the engine of the analysis module (pandas or modin)
-from brfast import config
+from brfast.config import params
 from executables.experiments import read_csv_analysis_as_dict
-pd = importlib.import_module(config['DataAnalysis']['engine'])
+pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 # The input files for the execution
 FINGERPRINT_DATASET_CSV = 'fingerprints.csv'

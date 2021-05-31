@@ -1,34 +1,22 @@
 #!/usr/bin/python3
 """Module containing the entropy-based exploration algorithm."""
 
+import importlib
 from datetime import datetime
+from math import ceil
+from multiprocessing import Pool
+from os import cpu_count
+from typing import Dict
 
 from loguru import logger
 
 from brfast.exploration import Exploration, State, TraceData
-from brfast.data import AttributeSet, FingerprintDataset
+from brfast.config import params
+from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.dataset import FingerprintDataset
 from brfast.measures.distinguishability.entropy import attribute_set_entropy
 from brfast.utils.sequences import sort_dict_by_value
-
-
-def _get_attributes_entropy(dataset: FingerprintDataset,
-                            attributes: AttributeSet):
-    """Give a dictionary with the entropy of each attribute.
-
-    Args:
-        dataset: The fingerprint dataset used to compute the entropy.
-        attributes: The attributes for which we compute the entropy.
-
-    Returns:
-        A dictionary with each attribute (Attribute) and its entropy.
-    """
-    attributes_entropy = {}
-    for attribute in attributes:
-        attributes_entropy[attribute] = attribute_set_entropy(
-            dataset, AttributeSet([attribute]))
-        logger.debug(f'  entropy({attribute.name}) = '
-                     f'{attributes_entropy[attribute]}')
-    return attributes_entropy
+pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 
 class Entropy(Exploration):
@@ -84,12 +72,12 @@ class Entropy(Exploration):
 
             # If it satisfies the sensitivity threshold, quit the loop
             if sensitivity <= self._sensitivity_threshold:
-                self._solution = attribute_set
-                self._satisfying_attribute_sets.add(attribute_set)
+                self._update_solution(attribute_set)
+                self._add_satisfying_attribute_set(attribute_set)
 
                 # Store this attribute set in the explored sets
                 compute_time = str(datetime.now() - self._start_time)
-                self._explored_attr_sets.append({
+                self._add_explored_attribute_set({
                     TraceData.TIME: compute_time,
                     TraceData.ATTRIBUTES: attribute_set.attribute_ids,
                     TraceData.SENSITIVITY: sensitivity,
@@ -103,7 +91,7 @@ class Entropy(Exploration):
 
             # If it does not satisfy the sensitivity threshold, we continue
             compute_time = str(datetime.now() - self._start_time)
-            self._explored_attr_sets.append({
+            self._add_explored_attribute_set({
                 TraceData.TIME: compute_time,
                 TraceData.ATTRIBUTES: attribute_set.attribute_ids,
                 TraceData.SENSITIVITY: sensitivity,
@@ -111,3 +99,106 @@ class Entropy(Exploration):
                 TraceData.COST_EXPLANATION: cost_explanation,
                 TraceData.STATE: State.EXPLORED
             })
+
+
+def _get_attributes_entropy(dataset: FingerprintDataset,
+                            attributes: AttributeSet
+                            ) -> Dict[Attribute, float]:
+    """Give a dictionary with the entropy of each attribute.
+
+    Args:
+        dataset: The fingerprint dataset used to compute the entropy.
+        attributes: The attributes for which we compute the entropy.
+
+    Raises:
+        ValueError: There are attributes and the fingerprint dataset is empty.
+        KeyError: An attribute is not in the fingerprint dataset.
+
+    Returns:
+        A dictionary with each attribute (Attribute) and its entropy.
+    """
+    # Some checks before starting the exploration
+    if attributes and dataset.dataframe.empty:
+        raise ValueError('Cannot compute the entropy on an empty dataset.')
+    for attribute in attributes:
+        if attribute not in dataset.candidate_attributes:
+            raise KeyError(f'The attribute {attribute} is not in the dataset.')
+
+    # We will work on a dataset with only a fingerprint per browser to avoid
+    # overcounting effects
+    df_one_fp_per_browser = dataset.get_df_w_one_fp_per_browser()
+
+    # If we execute on a single process
+    if not params.getboolean('Multiprocessing', 'explorations'):
+        logger.debug('Measuring the attributes entropy on a single process...')
+        return _compute_attribute_entropy(df_one_fp_per_browser, attributes)
+
+    # The dictionary to update when using multiprocessing
+    logger.debug('Measuring the attributes entropy using multiprocessing...')
+    attributes_entropy = {}
+
+    # Infer the number of cores to use
+    free_cores = params.getint('Multiprocessing', 'free_cores')
+    nb_cores = max(cpu_count() - free_cores, 1)
+    attributes_per_core = int(ceil(len(attributes)/nb_cores))
+    logger.debug(f'Sharing {len(attributes)} attributes over '
+                 f'{nb_cores}(+{free_cores}) cores, hence '
+                 f'{attributes_per_core} attributes per core.')
+
+    def update_attributes_entropy(attrs_entropy: Dict[Attribute, float]):
+        """Update the complete dictionary attributes_entropy.
+
+        Args:
+            attrs_size: The dictionary containing the subset of the results
+                        computed by a process.
+
+        Note: This is executed by the main thread and does not pose any
+              concurrency or synchronization problem.
+        """
+        for attribute, attribute_entropy in attrs_entropy.items():
+            attributes_entropy[attribute] = attribute_entropy
+
+    # Spawn a number of processes equal to the number of cores
+    attributes_list = list(attributes)
+    async_results = []
+    with Pool(processes=nb_cores) as pool:
+        for process_id in range(nb_cores):
+            # Generate the candidate attributes for this process
+            start_id = process_id * attributes_per_core
+            end_id = (process_id + 1) * attributes_per_core
+            attributes_subset = AttributeSet(attributes_list[start_id:end_id])
+
+            async_result = pool.apply_async(
+                _compute_attribute_entropy,
+                args=(df_one_fp_per_browser, attributes_subset),
+                callback=update_attributes_entropy)
+            async_results.append(async_result)
+
+        # Wait for all the processes to finish (otherwise we would exit
+        # before collecting their result)
+        for async_result in async_results:
+            async_result.wait()
+
+    return attributes_entropy
+
+
+def _compute_attribute_entropy(df_one_fp_per_browser: pd.DataFrame,
+                               attributes_subset: AttributeSet
+                               ) -> Dict[Attribute, float]:
+    """Compute the entropy of each attribute (passed to each process).
+
+    Args:
+        df_one_fp_per_browser: The dataframe with only one fingerprint per
+                               browser.
+        attributes_subset: The attributes for which to compute the entropy.
+
+    Returns:
+        A dictionary mapping each attribute to its entropy.
+    """
+    attributes_entropy = {}
+
+    for attribute in attributes_subset:
+        attributes_entropy[attribute] = attribute_set_entropy(
+            df_one_fp_per_browser, AttributeSet([attribute]))
+
+    return attributes_entropy

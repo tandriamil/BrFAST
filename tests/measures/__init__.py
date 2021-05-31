@@ -4,7 +4,7 @@
 They simulate the lattice displayed in our FPSelect example.
 """
 
-from brfast.data import AttributeSet
+from brfast.data.attribute import AttributeSet
 from brfast.measures import UsabilityCostMeasure, SensitivityMeasure
 
 

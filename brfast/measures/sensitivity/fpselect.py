@@ -6,13 +6,14 @@ from typing import List
 
 from loguru import logger
 
-from brfast.data import (AttributeSet, FingerprintDataset, MetadataField)
+from brfast.data.attribute import AttributeSet
+from brfast.data.dataset import FingerprintDataset
 from brfast.measures import SensitivityMeasure
 # from measures.similarity import TODO
 
 # Import the engine of the analysis module (pandas or modin)
-from brfast import config
-pd = importlib.import_module(config['DataAnalysis']['engine'])
+from brfast.config import params
+pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 PROPORTION_FIELD = 'proportion'
 

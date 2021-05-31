@@ -4,7 +4,7 @@
 import unittest
 from copy import copy
 
-from brfast.data import Attribute, AttributeSet
+from brfast.data.attribute import Attribute, AttributeSet
 from brfast.measures.usability_cost.fpselect import (
     IncorrectWeightDimensions, MemoryInstability, MemoryInstabilityTime,
     CostDimension)

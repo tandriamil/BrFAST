@@ -13,3 +13,13 @@ main > .container {
 footer {
   text-align: center;
 }
+
+/* The invisible elements should not be displayed */
+.invisible {
+  display: none;
+}
+
+/* Add some space between the form rows */
+.form-row {
+  margin-bottom: 15px;
+}

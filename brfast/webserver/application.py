@@ -2,39 +2,63 @@
 """Run the Flask webserver. Note that it is multithreaded by default."""
 
 import secrets
+from csv import DictReader
+from datetime import datetime
+from http import HTTPStatus
+from json.decoder import JSONDecodeError
+from pathlib import PurePath
 
 from flask import (abort, flash, Flask, json, jsonify, redirect, request,
-                   render_template, url_for)
+                   render_template, send_file, url_for)
 from loguru import logger
-from werkzeug.utils import secure_filename
 
-from brfast.data import (Attribute, AttributeSet,
-                         FingerprintDatasetFromCSVInMemory)
-from brfast.exploration import State, TraceData
+from brfast.config import params
+from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.dataset import (FingerprintDatasetFromCSVInMemory,
+                                 MissingMetadatasFields)
+from brfast.exploration import ExplorationParameters, State, TraceData
+from brfast.exploration.conditional_entropy import ConditionalEntropy
+from brfast.exploration.entropy import Entropy
+from brfast.exploration.fpselect import FPSelect
 from brfast.measures.sample.attribute_subset import AttributeSetSample
 from brfast.measures.distinguishability.entropy import AttributeSetEntropy
 from brfast.measures.distinguishability.unicity import (
     AttributeSetUnicity, UNICITY_RATE_RESULT, UNIQUE_FPS_RESULT,
     TOTAL_BROWSERS_RESULT)
-from brfast.webserver.file_utils import allowed_extension
+from brfast.measures.sensitivity.fpselect import TopKFingerprints
+from brfast.measures.usability_cost.fpselect import (
+    CostDimension, MemoryInstability, MemoryInstabilityTime)
+from brfast.utils.conversion import is_str_float
+from brfast.webserver.files_verification import trace_file_errors
+from brfast.webserver.form_validation import (
+    erroneous_field, erroneous_post_file)
 
-# Global variables used for the backend application
-FLASH_CAT_TO_CLASS = {'error': 'danger', 'warning': 'warning', 'info': 'info',
-                      'success': 'success'}
-UPLOAD_FOLDER = '/tmp'
 
-# The flask application
+# The Flask application
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.secret_key = secrets.token_bytes(32)
+app.config['UPLOAD_FOLDER'] = params.get('WebServer', 'upload_folder')
+app.secret_key = secrets.token_bytes(
+    params.getint('WebServer', 'secret_key_size'))
 
-# Parameters for the webserver
-BOOTSTRAP_PROGRESS_BARS = ['', '-success', '-info', '-warning', '-danger']
-FINGERPRINT_SAMPLE_SIZE = 10
+# Set the exploration methods, the sensitivity measures, and the usability cost
+# measures below
+EXPLORATION_METHODS = {'FPSelect': FPSelect, 'Entropy': Entropy,
+                       'Conditional entropy': ConditionalEntropy}
+SENSITIVITY_MEASURES = {'Top-k fingerprints': TopKFingerprints}
+USABILITY_COST_MEASURES = {
+    'Memory and instability': MemoryInstability,
+    'Memory, instability, and collection time': MemoryInstabilityTime}
+
+# The empty node that is virtually added to the explored attribute sets
+EMPTY_NODE = {'time': '0:00:00.00000', 'attributes': [], 'sensitivity': 1.0,
+              'usability_cost': 0, 'cost_explanation': {},
+              'state': State.EMPTY_NODE, 'id': -1}
 
 # Global variables used to share data between the pages
 FINGERPRINT_DATASET = None
 TRACE_DATA = None
+REAL_TIME_EXPLORATION = None
+EXPLORATION_PROCESS = None
 
 
 @app.route('/')
@@ -46,67 +70,68 @@ def index():
 # ================================ Trace Replay ===============================
 @app.route('/trace-configuration', methods=['GET', 'POST'])
 def trace_configuration():
-    """Configure the assets for a trace replay."""
-    global FINGERPRINT_DATASET
+    """Configure the trace file and the optional dataset to replay a trace."""
     global TRACE_DATA
+    global FINGERPRINT_DATASET
+    global REAL_TIME_EXPLORATION
+    global EXPLORATION_PROCESS
 
     # -------------------------- POST request handle --------------------------
     if request.method == 'POST':
-
         # ------------------- Manage the required trace file ------------------
+        # Clear the previous data if there were some
+        TRACE_DATA, FINGERPRINT_DATASET = None, None
+        if EXPLORATION_PROCESS:
+            EXPLORATION_PROCESS.terminate()
+            EXPLORATION_PROCESS = None
+        REAL_TIME_EXPLORATION = None
+
         # Check that the trace file is in the received POST request
-        if 'trace-file' not in request.files:
-            flash('Missing trace file!', FLASH_CAT_TO_CLASS['error'])
-            logger.error('Missing trace file from trace configuration POST.')
+        trace_file_error_message = erroneous_post_file(
+            request, 'trace-file', expected_extension='json')
+        if trace_file_error_message:
             return render_template('trace-configuration.html')
 
-        # Check that the trace file is correct
-        trace_file = request.files['trace-file']
-        trace_filename = secure_filename(trace_file.filename)
-        if not trace_file or trace_filename == '':
-            flash('No selected trace file!', FLASH_CAT_TO_CLASS['error'])
-            logger.error('No selected trace file in POST.')
+        # Load the content of the trace file as a dictionary from the json
+        try:
+            TRACE_DATA = json.load(request.files['trace-file'])
+        except JSONDecodeError:
+            error_message = 'The trace file is not correctly formated.'
+            flash(error_message, params.get('WebServer', 'flash_error_class'))
+            logger.error(error_message)
             return render_template('trace-configuration.html')
 
-        # Check that the extension of the trace file is allowed
-        if not allowed_extension(trace_filename, expected_extension='json'):
-            flash('The file extension is not allowed, json expected.',
-                  FLASH_CAT_TO_CLASS['error'])
-            logger.error(f'The file extension of {trace_filename} is not '
-                         'allowed.')
+        # Check the content of the trace file
+        if error_message := trace_file_errors(TRACE_DATA):
+            flash(error_message, params.get('WebServer', 'flash_error_class'))
+            logger.error(error_message)
             return render_template('trace-configuration.html')
 
-        # The trace file is correct, set is as the trace
-        if TRACE_DATA:
-            logger.warning('Trace data already set but updated now.')
-        TRACE_DATA = json.load(trace_file)
-        logger.info('The trace is set in the session.')
+        logger.info('The trace is correct and set.')
         # --------- End of the management of the required trace file ----------
 
-        # ------------ Manage the fingerprint dataset optional file -----------
-        # Check that the fingerprint dataset is in the POST request
-        if all(('fingerprint-dataset' in request.files,
-                request.files['fingerprint-dataset'],
-                request.files['fingerprint-dataset'].filename != '')):
-            fp_dataset_file = request.files['fingerprint-dataset']
-            fp_dataset_filename = secure_filename(fp_dataset_file.filename)
-
-            # Check the extension of the fingerprint dataset file
-            if not allowed_extension(fp_dataset_filename,
-                                     expected_extension='csv'):
-                flash('The fingerprint dataset file extension is not allowed, '
-                      'csv expected.', FLASH_CAT_TO_CLASS['error'])
-                logger.error(f'The file extension of {fp_dataset_filename} is '
-                             'not allowed.')
-            else:
-                logger.debug('Correctly received the optional dataset file.')
-                if FINGERPRINT_DATASET:
-                    logger.warning('Fingerprint dataset already set but '
-                                   'updated now.')
-                FINGERPRINT_DATASET = FingerprintDatasetFromCSVInMemory(
-                    fp_dataset_file)
-                logger.debug('The fingerprint dataset is set.')
-        # -- End of the management of the fingerprint dataset optional file ---
+        # ------------ Manage the optional fingerprint dataset file -----------
+        # Process the fingerprint dataset file if there is one provided
+        dataset_provided = ('fingerprint-dataset' in request.files
+                            and request.files['fingerprint-dataset'])
+        if dataset_provided:
+            # Check that the fingerprint dataset is in the POST request
+            fp_dataset_error_message = erroneous_post_file(
+                request, 'fingerprint-dataset', expected_extension='csv')
+            if not fp_dataset_error_message:
+                # Try to load the fingerprint dataset, we ignore the dataset if
+                # there is an error and display a warning to the user
+                try:
+                    FINGERPRINT_DATASET = FingerprintDatasetFromCSVInMemory(
+                        request.files['fingerprint-dataset'])
+                    logger.debug('The fingerprint dataset is set.')
+                except MissingMetadatasFields as mmf_error:
+                    error_message = ('Ignored the fingerprint dataset due to '
+                                     'the error: ' + str(mmf_error))
+                    flash(error_message, params.get('WebServer',
+                                                    'flash_warning_class'))
+                    logger.warning(error_message)
+        # -- End of the management of the optional fingerprint dataset file ---
 
         # At the end, redirect to the trace replay page
         return redirect(url_for('trace_replay'))
@@ -121,18 +146,372 @@ def trace_replay():
     """Show the trace replay page with the visualization."""
     global TRACE_DATA
 
-    # If there is no trace data set, redirect to the trace configuration page
+    # If there is no trace data set, throw a 404 error
     if not TRACE_DATA:
-        logger.warning('Trying to access trace-replay without a trace set.')
-        return redirect(url_for('trace_configuration'))
+        error_message = ('Accessing the trace replay page requires a '
+                         'trace to be set.')
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
-    # Show the trace visualization page
-    return render_template('trace-visualization.html',
-                           parameters=TRACE_DATA[TraceData.PARAMETERS])
+    # Show the visualization page
+    return render_template('visualization.html',
+                           parameters=TRACE_DATA[TraceData.PARAMETERS],
+                           javascript_parameters=params)
 
 
-@app.route('/get-trace/<int:start>/<int:end>')
-def get_trace(start, end):
+# =========================== Real Time Exploration ===========================
+@app.route('/real-time-exploration-configuration', methods=['GET', 'POST'])
+def real_time_exploration_configuration():
+    """Configure the assets for a real time exploration."""
+    global TRACE_DATA
+    global FINGERPRINT_DATASET
+    global REAL_TIME_EXPLORATION
+    global EXPLORATION_PROCESS
+
+    # The exploration methods, sensitivity and usability cost measures
+    exploration_methods = list(EXPLORATION_METHODS.keys())
+    sensitivity_measures = list(SENSITIVITY_MEASURES.keys())
+    usability_cost_measures = list(USABILITY_COST_MEASURES.keys())
+
+    # We store a dictionary mapping each form field to an error message if the
+    # field is invalid
+    errors = {}
+
+    # -------------------------- POST request handle --------------------------
+    if request.method == 'POST':
+        # Clear the previous data if there were some
+        TRACE_DATA, FINGERPRINT_DATASET = None, None
+        if EXPLORATION_PROCESS:
+            EXPLORATION_PROCESS.terminate()
+            EXPLORATION_PROCESS = None
+        REAL_TIME_EXPLORATION = None
+
+        # ------------ Manage the required fingerprint dataset file -----------
+        # Check that the dataset file is in the received POST request
+        fp_dataset_error_message = erroneous_post_file(
+            request, 'fingerprint-dataset', expected_extension='csv')
+        if fp_dataset_error_message:
+            errors['fingerprint-dataset'] = fp_dataset_error_message
+        # --------- End of the management of the required trace file ----------
+
+        # ------------------ Handle the sensitivity threshold -----------------
+        sens_thresh_error_message = erroneous_field(
+            request, 'sensitivity-threshold',
+            lambda v: v and is_str_float(v) and float(v) >= 0.0,
+            'The sensitivity threshold should be a positive float.')
+        if sens_thresh_error_message:
+            errors['sensitivity-threshold'] = sens_thresh_error_message
+        else:
+            sensitivity_threshold = float(
+                request.form['sensitivity-threshold'])
+        # -------------- End of handle the sensitivity threshold --------------
+
+        # ------------------- Handle the exploration method -------------------
+        exploration_method_error_message = erroneous_field(
+            request, 'exploration-method', lambda v: v in exploration_methods,
+            'The exploration method is unknown.')
+        if exploration_method_error_message:
+            errors['exploration-method'] = exploration_method_error_message
+        else:
+            exploration_method = request.form['exploration-method']
+        # --------------- End of handle the exploration method ----------------
+
+        # ------------------ Handle the FPSelect parameters -------------------
+        fpselect_method_name = exploration_methods[0]
+        if exploration_method == fpselect_method_name:
+            use_pruning_methods = 'use-pruning-methods' in request.form
+
+            # Check that it is a strictly positive integer comprised in the
+            # expected range
+            minimum_explored_paths = params.getint(
+                'WebServer', 'fpselect_minimum_explored_paths')
+            maximum_explored_paths = params.getint(
+                'WebServer', 'fpselect_maximum_explored_paths')
+            explored_paths_error_message = erroneous_field(
+                request, 'explored-paths',
+                lambda v: v.isdigit() and (0 < minimum_explored_paths <= int(v)
+                                           <= maximum_explored_paths),
+                'The number of explored paths is required to be a strictly '
+                'positive integer comprised in '
+                f'[{minimum_explored_paths}; {maximum_explored_paths}].')
+            if explored_paths_error_message:
+                errors['explored-paths'] = explored_paths_error_message
+            else:
+                explored_paths = int(request.form['explored-paths'])
+        # -------------- End of handle the FPSelect parameters ----------------
+
+        # ------------------ Handle the sensitivity measure -------------------
+        sensitivity_measure_error_message = erroneous_field(
+            request, 'sensitivity-measure',
+            lambda v: v in sensitivity_measures,
+            'Unknown sensitivity measure.')
+        if sensitivity_measure_error_message:
+            errors['sensitivity-measure'] = sensitivity_measure_error_message
+        else:
+            sensitivity_measure = request.form['sensitivity-measure']
+        # -------------- End of handle the sensitivity measure ----------------
+
+        # ------------- Handle the most common fingerprints (=k) --------------
+        top_k_fps_sens_meas = sensitivity_measures[0]
+        if sensitivity_measure == top_k_fps_sens_meas:
+            minimum_common_fps = params.getint(
+                'WebServer', 'top_k_fingerprints_sensitivity_measure_min_k')
+            maximum_common_fps = params.getint(
+                'WebServer', 'top_k_fingerprints_sensitivity_measure_max_k')
+
+            # Check that it is a strictly positive integer and comprised in the
+            # range
+            top_k_fps_error_message = erroneous_field(
+                request, 'most-common-fingerprints',
+                lambda v: v.isdigit() and (0 < minimum_common_fps <= int(v)
+                                           <= maximum_common_fps),
+                'The number of explored paths is required to be a strictly '
+                'positive integer and comprised in the range'
+                f'[{minimum_common_fps}; {maximum_common_fps}].')
+            if top_k_fps_error_message:
+                errors['most-common-fingerprints'] = top_k_fps_error_message
+            else:
+                most_common_fingerprints = int(
+                    request.form['most-common-fingerprints'])
+        # --------- End of handle the most common fingerprints (=k) -----------
+
+        # --- Initialize the dataset (needed to process the usability costs)
+        candidate_attributes = None
+        try:
+            FINGERPRINT_DATASET = FingerprintDatasetFromCSVInMemory(
+                request.files['fingerprint-dataset'])
+
+            # We will need the candidate attributes afterwards
+            candidate_attributes = FINGERPRINT_DATASET.candidate_attributes
+        except MissingMetadatasFields as mmf_error:
+            error_message = str(mmf_error)
+            flash(error_message, params.get('WebServer', 'flash_error_class'))
+            logger.error(error_message)
+            errors['fingerprint-dataset'] = error_message
+
+        logger.debug('The fingerprint dataset is set.')
+
+        # ----------------- Handle the usability cost measure -----------------
+        # The weights of the cost dimensions
+        cost_dim_weights = {}
+
+        # Check the chosen usability cost measure
+        usab_cost_meas_error_message = erroneous_field(
+            request, 'usability-cost-measure',
+            lambda v: v in usability_cost_measures,
+            'Unknown usability cost measure.')
+        if usab_cost_meas_error_message:
+            errors['usability-cost-measure'] = usab_cost_meas_error_message
+        else:
+            usability_cost_measure = request.form['usability-cost-measure']
+            # All the usability cost measures for now include the memory cost
+            # and the instability cost, check these two
+
+            # The memory cost results
+            memory_file_error_message = erroneous_post_file(
+                request, 'memory-cost-results', expected_extension='csv')
+            if memory_file_error_message:
+                errors['memory-cost-results'] = memory_file_error_message
+
+            # The memory cost weight
+            memory_weight_error_message = erroneous_field(
+                request, 'memory-cost-weight',
+                lambda v: v and is_str_float(v) and float(v) >= 0.0,
+                'The memory cost weight should be a positive float.')
+            if memory_weight_error_message:
+                errors['memory-cost-weight'] = memory_weight_error_message
+            else:
+                cost_dim_weights[CostDimension.MEMORY] = float(
+                    request.form['memory-cost-weight'])
+
+            # Read the memory cost results
+            if candidate_attributes:
+                memory_cost_content = (request.files['memory-cost-results']
+                                       .read().decode().splitlines())
+                memory_costs = {}
+                mem_file_reader = DictReader(memory_cost_content)
+                for row in mem_file_reader:
+                    try:
+                        attribute = candidate_attributes.get_attribute_by_name(
+                            row['attribute'])
+                        memory_costs[attribute] = float(row['average_size'])
+                    except KeyError as key_error:
+                        error_message = (
+                            f'The {key_error.args[0]} field is missing from '
+                            'the memory cost results file.')
+                        flash(error_message, params.get('WebServer',
+                                                        'flash_error_class'))
+                        logger.error(error_message)
+                        errors['memory-cost-results'] = error_message
+                        break  # Exit the for loop
+
+            # The instability cost results
+            instab_file_error_message = erroneous_post_file(
+                request, 'instability-cost-results', expected_extension='csv')
+            if instab_file_error_message:
+                errors['instability-cost-results'] = instab_file_error_message
+
+            # The instability cost weight
+            instab_weight_error_message = erroneous_field(
+                request, 'instability-cost-weight',
+                lambda v: v and is_str_float(v) and float(v) >= 0.0,
+                'The instability cost weight should be a positive float.')
+            if instab_weight_error_message:
+                errors['instability-cost-weight'] = instab_weight_error_message
+            else:
+                cost_dim_weights[CostDimension.INSTABILITY] = float(
+                    request.form['instability-cost-weight'])
+
+            # Read the instability cost results
+            if candidate_attributes:
+                instability_cost_content = (
+                    request.files['instability-cost-results']
+                    .read().decode().splitlines())
+                instability_costs = {}
+                instability_file_reader = DictReader(instability_cost_content)
+                for row in instability_file_reader:
+                    try:
+                        attribute = candidate_attributes.get_attribute_by_name(
+                            row['attribute'])
+                        instability_costs[attribute] = float(
+                            row['proportion_of_changes'])
+                    except KeyError as key_error:
+                        error_message = (
+                            f'The {key_error.args[0]} field is missing from '
+                            'the instability cost results file.')
+                        flash(error_message, params.get('WebServer',
+                                                        'flash_error_class'))
+                        logger.error(error_message)
+                        errors['instability-cost-results'] = error_message
+                        break  # Exit the for loop
+
+            # If there is also the collection time to consider
+            mem_inst_time_usab_cost = usability_cost_measures[1]
+            if usability_cost_measure == mem_inst_time_usab_cost:
+                # The collection time cost results
+                ct_file_err_mess = erroneous_post_file(
+                    request, 'collection-time-cost-results',
+                    expected_extension='csv')
+                if ct_file_err_mess:
+                    errors['collection-time-cost-results'] = ct_file_err_mess
+
+                # The collection time cost weight
+                col_time_weight_error_message = erroneous_field(
+                    request, 'collection-time-cost-weight',
+                    lambda v: v and is_str_float(v) and float(v) >= 0.0,
+                    'The weight of the collection time cost should be a '
+                    'positive float.')
+                if col_time_weight_error_message:
+                    errors['collection-time-cost-weight'] = (
+                        col_time_weight_error_message)
+                else:
+                    cost_dim_weights[CostDimension.TIME] = float(
+                        request.form['collection-time-cost-weight'])
+
+                # Read the content of the collection time results
+                if candidate_attributes:
+                    collection_time_content = (
+                        request.files['collection-time-cost-results']
+                        .read().decode().splitlines())
+                    collection_time_costs = {}
+                    coll_time_file_reader = DictReader(collection_time_content)
+                    for row in coll_time_file_reader:
+                        try:
+                            attribute = (
+                                candidate_attributes.get_attribute_by_name(
+                                    row['attribute']))
+                            collection_time_costs[attribute] = (
+                                float(row['average_collection_time']),
+                                bool(row['is_asynchronous']))
+                        except KeyError as key_error:
+                            err_mess = (
+                                f'The {key_error.args[0]} field is missing '
+                                'from the collection time cost results file.')
+                            flash(err_mess, params.get(
+                                'WebServer', 'flash_error_class'))
+                            logger.error(err_mess)
+                            errors['collection-time-cost-results'] = err_mess
+                            break  # Exit the for loop
+        # ------------- End of handle the usability cost measure --------------
+
+        # At the end, redirect to the real time exploration page if there are
+        # no errors, otherwise redirect to the configuration page.
+        if not errors:
+            # --- Initialize the sensitivity measure
+            sens_meas_class = SENSITIVITY_MEASURES[sensitivity_measure]
+            # For now on, there is only the TopKFingerprints
+            actual_sens_meas = sens_meas_class(
+                FINGERPRINT_DATASET, most_common_fingerprints)
+            logger.debug('Initialized the sensitivity measure '
+                         f'{actual_sens_meas}.')
+
+            # --- Initialize the usability cost measure
+            usab_cost_meas_class = USABILITY_COST_MEASURES[
+                usability_cost_measure]
+
+            if usability_cost_measure == mem_inst_time_usab_cost:
+                # Initialize the memory, instability, and collection time
+                actual_usab_cost_meas = usab_cost_meas_class(
+                    memory_costs, instability_costs, collection_time_costs,
+                    cost_dim_weights)
+            else:
+                actual_usab_cost_meas = usab_cost_meas_class(
+                    memory_costs, instability_costs, cost_dim_weights)
+            logger.debug('Initialized the usability cost measure '
+                         f'{actual_usab_cost_meas}.')
+
+            # --- Initialize the exploration class
+            exploration_class = EXPLORATION_METHODS[exploration_method]
+
+            # If FPSelect
+            if exploration_method == fpselect_method_name:
+                exploration = exploration_class(
+                    actual_sens_meas, actual_usab_cost_meas,
+                    FINGERPRINT_DATASET, sensitivity_threshold, explored_paths,
+                    use_pruning_methods)
+            else:
+                exploration = exploration_class(
+                    actual_sens_meas, actual_usab_cost_meas,
+                    FINGERPRINT_DATASET, sensitivity_threshold)
+            logger.debug(f'Initialized the exploration {exploration}.')
+
+            # Execute the exploration in an asynchronous manner before
+            REAL_TIME_EXPLORATION = exploration
+            EXPLORATION_PROCESS = REAL_TIME_EXPLORATION.run_asynchronous()
+
+            logger.debug('Redirecting to the real time exploration page')
+            return redirect(url_for('real_time_exploration'))
+        # -------------------- End of POST request handle ---------------------
+
+    # Show the real time exploration configuration page
+    return render_template(
+        'real-time-exploration-configuration.html',
+        params=params, errors=errors, exploration_methods=exploration_methods,
+        sensitivity_measures=sensitivity_measures,
+        usability_cost_measures=usability_cost_measures)
+
+
+@app.route('/real-time-exploration')
+def real_time_exploration():
+    """Display the real time exploration visualization."""
+    global REAL_TIME_EXPLORATION
+    global EXPLORATION_PROCESS
+
+    if not REAL_TIME_EXPLORATION or not EXPLORATION_PROCESS:
+        error_message = ('Accessing the real time exploration requires a real '
+                         'time exploration to be set and launched.')
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
+
+    # Show the visualization page
+    return render_template('visualization.html',
+                           parameters=REAL_TIME_EXPLORATION.parameters,
+                           javascript_parameters=params)
+
+
+# =================== Getter of the Explored Attribute Sets ===================
+@app.route('/get-explored-attribute-sets/<int:start>/<int:end>')
+def get_explored_attribute_sets(start: int, end: int):
     """Provide the explored attribute sets.
 
     Args:
@@ -140,25 +519,99 @@ def get_trace(start, end):
         end: The id of the last explored attribute set to include.
 
     Returns:
-        A json textual result with a list of the explored attribute sets or an
-        empty list of there is an error or no more attribute sets.
+        A json textual result with a boolean indicating if there are attribute
+        sets that remain and the list of the explored attribute sets.
     """
     global TRACE_DATA
+    global REAL_TIME_EXPLORATION
+    global EXPLORATION_PROCESS
+    data = {}
 
-    # No trace data => returns an empty list
-    if not TRACE_DATA:
-        error_message = 'Trying to access get-trace without a trace set.'
+    if REAL_TIME_EXPLORATION and EXPLORATION_PROCESS:
+        logger.info(f'Getting the nodes from {start} to {end} (real time).')
+        data['explored_attribute_sets'] = (
+            REAL_TIME_EXPLORATION.get_explored_attribute_sets(start, end))
+        data['remaining'] = (data['explored_attribute_sets']
+                             or EXPLORATION_PROCESS.is_alive())
+        for eas_id, exp_attr_set in enumerate(data['explored_attribute_sets']):
+            exp_attr_set['id'] = eas_id + start
+
+    elif TRACE_DATA:
+        logger.info(f'Getting the nodes from {start} to {end} (trace replay).')
+        explored_attribute_sets = TRACE_DATA[TraceData.EXPLORATION][start:end]
+        data['remaining'] = bool(explored_attribute_sets)  # False if empty
+        data['explored_attribute_sets'] = explored_attribute_sets
+
+    else:
+        error_message = ('Accessing the get trace page requires a trace or a '
+                         'real time exploration to be set.')
         logger.error(error_message)
-        abort(404, description=error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     # Provide the explored attribute sets
-    logger.info(f'Getting the trace from {start} to {end}.')
-    return json.dumps(TRACE_DATA[TraceData.EXPLORATION][start:end])
+    return json.dumps(data)
+
+
+# ============== Getter for the trace of the current exploration ==============
+@app.route('/download-trace')
+def download_trace():
+    """Provide the trace of the current exploration to be downloaded.
+
+    Note:
+        The file will be saved in the configured upload folder and WILL NOT be
+        deleted afterwards. A trick is to use the /tmp directory for them to be
+        automatically deleted.
+
+    Returns:
+        The trace of the current exploration in json format if it is finished.
+    """
+    global TRACE_DATA
+    global REAL_TIME_EXPLORATION
+    global EXPLORATION_PROCESS
+
+    # If we are in the trace mode
+    if TRACE_DATA:
+        expl_params = TRACE_DATA[TraceData.PARAMETERS]
+
+    # If there is no trace data nor real time exploration set
+    elif not REAL_TIME_EXPLORATION:
+        error_message = 'No real time exploration nor replayed trace is set.'
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
+
+    # If there is an exploration but it has not finished yet
+    elif EXPLORATION_PROCESS.is_alive():
+        error_message = 'Please wait for the exploration to finish.'
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
+
+    # Everything is fine for the real time exploration
+    else:
+        expl_params = REAL_TIME_EXPLORATION.parameters
+
+    # Get the parameters of the exploration
+    method = expl_params[ExplorationParameters.METHOD].lower()
+    sens_threshold = expl_params[ExplorationParameters.SENSITIVITY_THRESHOLD]
+
+    # Everything is fine, save the exploration trace
+    curr_time = datetime.now().strftime('%Y-%m-%d--%H-%M-%S')
+    trace_filename = f'exploration-{curr_time}-{method}-{sens_threshold}.json'
+    save_path = PurePath(app.config['UPLOAD_FOLDER']).joinpath(trace_filename)
+
+    # Save the trace file at this path
+    if TRACE_DATA:
+        with open(save_path, 'w+') as saved_trace_file:
+            json.dump(TRACE_DATA, saved_trace_file)
+    else:
+        REAL_TIME_EXPLORATION.save_exploration_trace(save_path)
+
+    # Send the file
+    return send_file(save_path, as_attachment=True)
 
 
 # ========================= Attribute Set Information =========================
-@app.route('/attribute-set/<int:attribute_set_id>')
-def attribute_set_information(attribute_set_id):
+@app.route('/attribute-set/<int(signed=True):attribute_set_id>')
+def attribute_set_information(attribute_set_id: int):
     """Show information about an attribute set.
 
     Args:
@@ -166,48 +619,69 @@ def attribute_set_information(attribute_set_id):
     """
     global TRACE_DATA
     global FINGERPRINT_DATASET
+    global REAL_TIME_EXPLORATION
     logger.info('Getting the information about the attribute set '
                 f'{attribute_set_id}.')
 
-    # If there is no trace data, show an error and redirect to the index page
-    if not TRACE_DATA:
-        logger.warning('Trying to access attribute-set without a trace set.')
-        flash('Accessing the attribute set information requires a trace to be '
-              ' set.', FLASH_CAT_TO_CLASS['error'])
-        return redirect(url_for('index'))
-
-    # Check that there is an explored attribute set with this id in the trace
+    # Check that there is an explored attribute set with this id in the
+    # trace
     attribute_set_infos = None
-    for explored_attr_set in TRACE_DATA['exploration']:
-        if explored_attr_set['id'] == attribute_set_id:
-            attribute_set_infos = explored_attr_set
-            break
+    if attribute_set_id == -1:
+        attribute_set_infos = EMPTY_NODE
+    elif REAL_TIME_EXPLORATION:
+        attribute_set_infos_list = (
+            REAL_TIME_EXPLORATION.get_explored_attribute_sets(
+                attribute_set_id, attribute_set_id+1))
+        if attribute_set_infos_list:
+            attribute_set_infos = attribute_set_infos_list[0]
+            attribute_set_infos['id'] = attribute_set_id
+    elif TRACE_DATA:
+        for explored_attr_set in TRACE_DATA['exploration']:
+            if explored_attr_set['id'] == attribute_set_id:
+                attribute_set_infos = explored_attr_set
+                break
+    else:
+        error_message = ('Accessing the attribute set information page '
+                         'requires a trace or a real time exploration to be '
+                         'set.')
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     if not attribute_set_infos:
-        logger.error(f'The attribute set id {attribute_set_id} was not found.')
-        flash(f'The attribute set id {attribute_set_id} was not found.',
-              FLASH_CAT_TO_CLASS['error'])
-        return redirect(url_for('index'))
+        error_message = (f'The attribute set id {attribute_set_id} was not'
+                         ' found.')
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     # Generate the attribute set object and get the names of these attributes
-    attributes = AttributeSet(
-        Attribute(attribute_id, TRACE_DATA['attributes'][str(attribute_id)])
-        for attribute_id in attribute_set_infos['attributes']
-    )
+    if REAL_TIME_EXPLORATION:
+        attributes = AttributeSet(
+            FINGERPRINT_DATASET.candidate_attributes.get_attribute_by_id(
+                attribute_id)
+            for attribute_id in attribute_set_infos['attributes'])
+    elif TRACE_DATA:
+        attributes = AttributeSet(
+            Attribute(attribute_id,
+                      TRACE_DATA['attributes'][str(attribute_id)])
+            for attribute_id in attribute_set_infos['attributes'])
     attribute_names = [attribute.name for attribute in attributes]
 
     # If there is a fingerprint dataset, compute the additional/optional
     # results from it (the subset for now)
     fingerprint_sample = None
-    if FINGERPRINT_DATASET:
+    if attribute_set_id == -1:
+        pass  # Avoid trying to get the subset with an empty attribute set
+    elif FINGERPRINT_DATASET:
         # Collect a sample of the resulting fingerprints
         attr_subset_sample = AttributeSetSample(
-            FINGERPRINT_DATASET, attributes, FINGERPRINT_SAMPLE_SIZE)
+            FINGERPRINT_DATASET, attributes,
+            params.getint('WebServer', 'fingerprint_sample_size'))
         attr_subset_sample.execute()
         fingerprint_sample = attr_subset_sample.result
     else:
         flash('Please provide a fingerprint dataset to obtain more insight on '
-              'the selected attributes', FLASH_CAT_TO_CLASS['info'])
+              'the selected attributes',
+              params.get('WebServer', 'flash_info_class'))
 
     # Compute the textual representation of the state of this attribute set
     attribute_set_state = None
@@ -225,28 +699,37 @@ def attribute_set_information(attribute_set_id):
     #                      percentage of the cost of the candidate attributes)
     # }
     usability_cost_ratio = {}
-    candidate_attributes_infos = TRACE_DATA['exploration'][0]
+    if REAL_TIME_EXPLORATION:
+        candidate_attributes_infos = (
+            REAL_TIME_EXPLORATION.get_explored_attribute_sets(0, 1)[0])
+    elif TRACE_DATA:
+        candidate_attributes_infos = TRACE_DATA['exploration'][0]
+    bootstrap_progess_bars = (params
+                              .get('WebServer', 'bootstrap_progess_bars')
+                              .splitlines())
 
     # The total usability cost
     cost_percentage = (100 * attribute_set_infos['usability_cost']
                        / candidate_attributes_infos['usability_cost'])
-    usability_cost_ratio['usability'] = (
-        BOOTSTRAP_PROGRESS_BARS[0], '%.2f' % cost_percentage)
+    usability_cost_ratio['usability'] = (bootstrap_progess_bars[0],
+                                         '%.2f' % cost_percentage)
 
-    # For each cost dimension except the "weighted" ones
-    can_attrs_cost_explanation = candidate_attributes_infos['cost_explanation']
-    progress_bar_class_id = 1  # 0 already taken
-    for cost_dimension, cost_value in can_attrs_cost_explanation.items():
-        if cost_dimension.startswith('weighted'):
-            continue
-        cost_percentage = (
-            100 * attribute_set_infos['cost_explanation'][cost_dimension]
-            / cost_value)
-        usability_cost_ratio[cost_dimension] = (
-            BOOTSTRAP_PROGRESS_BARS[
-                progress_bar_class_id % len(BOOTSTRAP_PROGRESS_BARS)],
-            '%.2f' % cost_percentage)
-        progress_bar_class_id += 1
+    if attribute_set_id > -1:
+        # For each cost dimension except the "weighted" ones
+        can_attrs_cost_explanation = candidate_attributes_infos[
+            'cost_explanation']
+        progress_bar_class_id = 1  # 0 already taken
+        for cost_dimension, cost_value in can_attrs_cost_explanation.items():
+            if cost_dimension.startswith('weighted'):
+                continue
+            cost_percentage = (
+                100 * attribute_set_infos['cost_explanation'][cost_dimension]
+                / cost_value)
+            usability_cost_ratio[cost_dimension] = (
+                bootstrap_progess_bars[
+                    progress_bar_class_id % len(bootstrap_progess_bars)],
+                '%.2f' % cost_percentage)
+            progress_bar_class_id += 1
 
     # Display the attribute information page
     return render_template('attribute-set-information.html',
@@ -254,11 +737,12 @@ def attribute_set_information(attribute_set_id):
                            attribute_names=attribute_names,
                            attribute_set_state=attribute_set_state,
                            usability_cost_ratio=usability_cost_ratio,
-                           fingerprint_sample=fingerprint_sample)
+                           fingerprint_sample=fingerprint_sample,
+                           javascript_parameters=params)
 
 
 @app.route('/attribute-set-entropy/<int:attribute_set_id>')
-def attribute_set_entropy(attribute_set_id):
+def attribute_set_entropy(attribute_set_id: int):
     """Provide the results about the entropy of an attribute set.
 
     Args:
@@ -267,38 +751,52 @@ def attribute_set_entropy(attribute_set_id):
     """
     global TRACE_DATA
     global FINGERPRINT_DATASET
+    global REAL_TIME_EXPLORATION
     logger.info('Getting the entropy results of the attribute set '
                 f'{attribute_set_id}.')
 
-    # If there is no trace data, show an error and redirect to the index page
-    if not TRACE_DATA:
-        error_message = 'No trace data set'
-        logger.error(error_message)
-        abort(404, description=error_message)
-
     # Check that there is an explored attribute set with this id in the trace
     attribute_set_infos = None
-    for explored_attr_set in TRACE_DATA['exploration']:
-        if explored_attr_set['id'] == attribute_set_id:
-            attribute_set_infos = explored_attr_set
-            break
+    if REAL_TIME_EXPLORATION:
+        attribute_set_infos_list = (
+            REAL_TIME_EXPLORATION.get_explored_attribute_sets(
+                attribute_set_id, attribute_set_id+1))
+        if attribute_set_infos_list:
+            attribute_set_infos = attribute_set_infos_list[0]
+            attribute_set_infos['id'] = attribute_set_id
+    elif TRACE_DATA:
+        for explored_attr_set in TRACE_DATA['exploration']:
+            if explored_attr_set['id'] == attribute_set_id:
+                attribute_set_infos = explored_attr_set
+                break
+    else:
+        error_message = ('Accessing the attribute set entropy page requires a '
+                         'trace or a real time exploration to be set.')
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
+
+    if not FINGERPRINT_DATASET:
+        error_message = 'No fingerprint dataset is set.'
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     if not attribute_set_infos:
         error_message = (f'The attribute set id {attribute_set_id} was not '
                          'found.')
         logger.error(error_message)
-        abort(404, description=error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
-    # Generate the attribute set object and get the names of these attributes
-    attributes = AttributeSet(
-        Attribute(attribute_id, TRACE_DATA['attributes'][str(attribute_id)])
-        for attribute_id in attribute_set_infos['attributes']
-    )
-
-    if not FINGERPRINT_DATASET:
-        error_message = 'No fingerprint dataset is set'
-        logger.error(error_message)
-        abort(404, description=error_message)
+    # Generate the attribute set object
+    if REAL_TIME_EXPLORATION:
+        attributes = AttributeSet(
+            FINGERPRINT_DATASET.candidate_attributes.get_attribute_by_id(
+                attribute_id)
+            for attribute_id in attribute_set_infos['attributes'])
+    elif TRACE_DATA:
+        attributes = AttributeSet(
+            Attribute(attribute_id,
+                      TRACE_DATA['attributes'][str(attribute_id)])
+            for attribute_id in attribute_set_infos['attributes'])
 
     # Compute the entropy of the resulting fingerprints
     attr_set_entropy = AttributeSetEntropy(FINGERPRINT_DATASET, attributes)
@@ -310,7 +808,7 @@ def attribute_set_entropy(attribute_set_id):
 
 
 @app.route('/attribute-set-unicity/<int:attribute_set_id>')
-def attribute_set_unicity(attribute_set_id):
+def attribute_set_unicity(attribute_set_id: int):
     """Provide the results about the unicity of an attribute set.
 
     Args:
@@ -319,38 +817,52 @@ def attribute_set_unicity(attribute_set_id):
     """
     global TRACE_DATA
     global FINGERPRINT_DATASET
+    global REAL_TIME_EXPLORATION
     logger.info('Getting the unicity results of the attribute set '
                 f'{attribute_set_id}.')
 
-    # If there is no trace data, show an error and redirect to the index page
-    if not TRACE_DATA:
-        error_message = 'No trace data set'
-        logger.error(error_message)
-        abort(404, description=error_message)
-
     # Check that there is an explored attribute set with this id in the trace
     attribute_set_infos = None
-    for explored_attr_set in TRACE_DATA['exploration']:
-        if explored_attr_set['id'] == attribute_set_id:
-            attribute_set_infos = explored_attr_set
-            break
+    if REAL_TIME_EXPLORATION:
+        attribute_set_infos_list = (
+            REAL_TIME_EXPLORATION.get_explored_attribute_sets(
+                attribute_set_id, attribute_set_id+1))
+        if attribute_set_infos_list:
+            attribute_set_infos = attribute_set_infos_list[0]
+            attribute_set_infos['id'] = attribute_set_id
+    elif TRACE_DATA:
+        for explored_attr_set in TRACE_DATA['exploration']:
+            if explored_attr_set['id'] == attribute_set_id:
+                attribute_set_infos = explored_attr_set
+                break
+    else:
+        error_message = ('Accessing the attribute set unicity page requires a '
+                         'trace or a real time exploration to be set.')
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
+
+    if not FINGERPRINT_DATASET:
+        error_message = 'No fingerprint dataset is set.'
+        logger.error(error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     if not attribute_set_infos:
         error_message = (f'The attribute set id {attribute_set_id} was not '
                          'found.')
         logger.error(error_message)
-        abort(404, description=error_message)
+        abort(HTTPStatus.NOT_FOUND, description=error_message)
 
-    # Generate the attribute set object and get the names of these attributes
-    attributes = AttributeSet(
-        Attribute(attribute_id, TRACE_DATA['attributes'][str(attribute_id)])
-        for attribute_id in attribute_set_infos['attributes']
-    )
-
-    if not FINGERPRINT_DATASET:
-        error_message = 'No fingerprint dataset is set'
-        logger.error(error_message)
-        abort(404, description=error_message)
+    # Generate the attribute set object
+    if REAL_TIME_EXPLORATION:
+        attributes = AttributeSet(
+            FINGERPRINT_DATASET.candidate_attributes.get_attribute_by_id(
+                attribute_id)
+            for attribute_id in attribute_set_infos['attributes'])
+    elif TRACE_DATA:
+        attributes = AttributeSet(
+            Attribute(attribute_id,
+                      TRACE_DATA['attributes'][str(attribute_id)])
+            for attribute_id in attribute_set_infos['attributes'])
 
     # Compute the unicity of the resulting fingerprints
     attr_set_unicity = AttributeSetUnicity(FINGERPRINT_DATASET, attributes)

@@ -3,7 +3,8 @@
 
 from typing import Any, List
 
-from brfast.data import AttributeSet, FingerprintDataset
+from brfast.data.attribute import AttributeSet
+from brfast.data.dataset import FingerprintDataset
 from brfast.measures import Analysis
 
 
@@ -17,14 +18,31 @@ class AttributeSetSample(Analysis):
         Args:
             dataset: The fingerprint dataset to analyze.
             attributes: The attributes to consider.
-            sample_size: The size of the sample that we are interested in.
+            sample_size: The size of the sample that we are interested in,
+                         reqired to be strictly positive.
+
+        Raises:
+            AttributeError: The sample size is required to be a strictly
+                            positive number.
         """
         super().__init__(dataset)
         self._attributes = attributes
+        if sample_size < 1:
+            raise AttributeError('The sample size is required to be a strictly'
+                                 ' positive number.')
         self._sample_size = sample_size
 
     def execute(self):
-        """Execute the analysis."""
+        """Execute the analysis.
+
+        Raises:
+            ValueError: The attribute set or the fingerprint dataset is empty.
+                        The provided sample is higher than the dataset size.
+        """
+        if not self._attributes or self._dataset.dataframe.empty:
+            raise ValueError('The attribute set of the fingerprint dataset '
+                             'should not be empty.')
+
         attribute_names = self._attributes.attribute_names
         # 1. Project the dataframe on the wanted columns.
         # 2. Get a sample of the provided size.
@@ -34,7 +52,7 @@ class AttributeSetSample(Analysis):
                         .sample(self._sample_size)
                         .to_records(index=False))
         for row_id, fingerprint in enumerate(fingerprints):
-            self._result[row_id] = fingerprint
+            self._result[row_id] = tuple(fingerprint)
 
     def _from_dict_to_row_list(self) -> List[List[Any]]:
         """Give the representation of the csv result as a list of rows.

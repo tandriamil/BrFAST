@@ -3,7 +3,7 @@
 
 from typing import Dict, Tuple
 
-from brfast.data import Attribute, AttributeSet
+from brfast.data.attribute import Attribute, AttributeSet
 from brfast.measures import UsabilityCostMeasure
 
 

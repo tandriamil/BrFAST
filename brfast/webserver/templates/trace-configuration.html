@@ -1,14 +1,14 @@
 {% extends "layout.html" %}
 
 {% block title %}
-  BrFAST - Browser Fingerprinting Attribute Selection Tool
+  BrFAST - Trace Replay Configuration
 {% endblock %}
 
 {% block content %}
   <div class="row margin-top-bottom">
     <div class="col-sm-1 col-md-2 col-lg-3"></div>
     <div class="col-sm-10 col-md-8 col-lg-6">
-      <h1>Please submit the files</h1>
+      <h2 style="text-align: center;">Please submit the files</h2>
 
       <br/>
 
@@ -27,9 +27,34 @@
 
         <br/>
 
-        <button type="submit" class="btn btn-primary">Send the files</button>
+        <button type="submit" class="btn btn-primary" data-toggle="modal" data-target="#loading-screen">Replay the trace</button>
       </form>
     </div>
     <div class="col-sm-1 col-md-2 col-lg-3"></div>
+  </div>
+
+  <!-- The loading screen modal -->
+  <div class="modal fade" id="loading-screen" tabindex="-1" aria-labelledby="loading-screen-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="loading-screen-label">Processing the input files...</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body" id="loading-screen-body">
+          <p>
+            The input files are being processed, please wait.
+            This can take some time depending on the size of the trace and the fingerprint dataset.
+          </p>
+          <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 {% endblock %}

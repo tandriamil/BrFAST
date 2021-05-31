@@ -6,7 +6,8 @@ from typing import Any, Dict, List, Tuple
 
 from loguru import logger
 
-from brfast.data import AttributeSet, FingerprintDataset
+from brfast.data.attribute import AttributeSet
+from brfast.data.dataset import FingerprintDataset
 
 
 class UsabilityCostMeasure:

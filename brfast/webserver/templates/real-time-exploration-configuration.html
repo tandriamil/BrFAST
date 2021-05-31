@@ -1,0 +1,381 @@
+{% extends "layout.html" %}
+
+{% block title %}
+  BrFAST - Real Time Exploration Configuration
+{% endblock %}
+
+{% block content %}
+  <div class="row margin-top-bottom">
+    <div class="col">
+      <h2 style="text-align: center;">Configuration of the real time exploration</h2>
+
+      <form method="POST" enctype="multipart/form-data">
+        <div class="form-row">
+          <div class="col">
+            <label for="fingerprint-dataset">Fingerprint dataset</label>
+            <div class="form-group custom-file">
+              <label for="fingerprint-dataset" class="custom-file-label">Fingerprint dataset</label>
+              <input type="file" class="form-control-file custom-file-input
+                {% if 'fingerprint-dataset' in errors %}
+                  is-invalid
+                {% endif %}
+                " name="fingerprint-dataset" id="fingerprint-dataset">
+              {% if 'fingerprint-dataset' in errors %}
+                <div id="validation-fingerprint-dataset" class="invalid-feedback">
+                  {{ errors['fingerprint-dataset'] }}
+                </div>
+              {% endif %}
+              <small class="form-text text-muted">
+                The fingerprint dataset as a csv file.
+                It should contain the metadatas named <i>browser_id</i> (any type accepted) and <i>time_of_collect</i> (a string representing a date and optionnally the time).
+              </small>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="sensitivity-threshold">Sensitivity threshold</label>
+              <input type="text" class="form-control
+              {% if 'sensitivity-threshold' in errors %}
+                is-invalid
+              {% endif %}
+              " id="sensitivity-threshold" name="sensitivity-threshold" placeholder="Sensitivity Threshold">
+              {% if 'sensitivity-threshold' in errors %}
+                <div id="validation-sensitivity-threshold" class="invalid-feedback">
+                  {{ errors['sensitivity-threshold'] }}
+                </div>
+              {% endif %}
+              <small class="form-text text-muted">
+                The sensitivity threshold to satisfy, comprised in [0; 1].
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="col">
+            <div class="form-group">
+              <label for="exploration-method">Exploration method</label>
+              <select class="form-control custom-select
+                {% if 'exploration-method' in errors %}
+                  is-invalid
+                {% endif %}
+              " id="exploration-method" name="exploration-method" oninput="setExplorationMethod(this.value)">
+                {% for exploration_method in exploration_methods %}
+                  <option value="{{ exploration_method }}">{{ exploration_method }}</option>
+                {% endfor %}
+              </select>
+              {% if 'exploration-method' in errors %}
+                <div id="validation-exploration-method" class="invalid-feedback">
+                  {{ errors['exploration-method'] }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="col exploration-method-parameters" id="fpselect-parameters">
+            <div class="form-group">
+              <label for="explored-paths">Explored paths: <span id="explored-paths-number">{{ params.getint('WebServer', 'fpselect_default_explored_paths') }}</span>
+              </label>
+              <input type="range" class="custom-range
+                {% if 'explored-paths' in errors %}
+                  is-invalid
+                {% endif %}
+              " id="explored-paths" name="explored-paths" value="{{ params.getint('WebServer', 'fpselect_default_explored_paths') }}" min="{{ params.getint('WebServer', 'fpselect_minimum_explored_paths') }}" max="{{ params.getint('WebServer', 'fpselect_maximum_explored_paths') }}" step="{{ params.getint('WebServer', 'fpselect_step_explored_paths') }}" oninput="updateExploredPathsNumber(this.value)">
+              {% if 'explored-paths' in errors %}
+                <div id="validation-explored-paths" class="invalid-feedback">
+                  {{ errors['explored-paths'] }}
+                </div>
+              {% endif %}
+              <small class="form-text text-muted">
+                The number of paths explored in the possibility lattice.
+              </small>
+            </div>
+            <div class="form-group">
+              <div class="form-check">
+                <input class="form-check-input
+                  {% if 'use-pruning-methods' in errors %}
+                    is-invalid
+                  {% endif %}
+                " type="checkbox" value="True" id="use-pruning-methods" name="use-pruning-methods" checked>
+                <label class="form-check-label" for="use-pruning-methods">
+                  Use the pruning methods
+                </label>
+                {% if 'use-pruning-methods' in errors %}
+                  <div id="validation-use-pruning-methods" class="invalid-feedback">
+                    {{ errors['use-pruning-methods'] }}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="col">
+            <div class="form-group">
+              <label for="sensitivity-measure">Sensitivity measure</label>
+              <select class="form-control custom-select
+                {% if 'sensitivity-measure' in errors %}
+                  is-invalid
+                {% endif %}
+              " id="sensitivity-measure" name="sensitivity-measure">
+                {% for sensitivity_measure in sensitivity_measures %}
+                  <option value="{{ sensitivity_measure }}">{{ sensitivity_measure }}</option>
+                {% endfor %}
+              </select>
+              {% if 'sensitivity-measure' in errors %}
+                <div id="validation-sensitivity-measure" class="invalid-feedback">
+                  {{ errors['sensitivity-measure'] }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="col sensitivity-measure-parameters" id="top-k-fingerprints-parameters">
+            <div class="form-group">
+              <label for="most-common-fingerprints">Most common fingerprints: <span id="most-common-fingerprints-number">{{ params.getint('WebServer', 'top_k_fingerprints_sensitivity_measure_default_k') }}</span>
+              </label>
+              <input type="range" class="custom-range
+                {% if 'most-common-fingerprints' in errors %}
+                  is-invalid
+                {% endif %}
+              " id="most-common-fingerprints" name="most-common-fingerprints" value="{{ params.getint('WebServer', 'top_k_fingerprints_sensitivity_measure_default_k') }}" min="{{ params.getint('WebServer', 'top_k_fingerprints_sensitivity_measure_min_k') }}" max="{{ params.getint('WebServer', 'top_k_fingerprints_sensitivity_measure_max_k') }}" step="{{ params.getint('WebServer', 'top_k_fingerprints_sensitivity_measure_step_k') }}" oninput="updateMostCommonFingerprints(this.value)">
+              {% if 'most-common-fingerprints' in errors %}
+                <div id="validation-most-common-fingerprints" class="invalid-feedback">
+                  {{ errors['most-common-fingerprints'] }}
+                </div>
+              {% endif %}
+              <small class="form-text text-muted">
+                The most common fingerprints to consider (i.e., the value of the <i>k</i> parameter).
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="col">
+            <div class="form-group">
+              <label for="usability-cost-measure">Usability cost measure</label>
+              <select class="form-control custom-select
+                {% if 'usability-cost-measure' in errors %}
+                  is-invalid
+                {% endif %}
+              " id="usability-cost-measure" name="usability-cost-measure" oninput="setUsabilityCostMeasure(this.value)">
+                <option>Memory and instability</option>
+                <option>Memory, instability, and collection time</option>
+              </select>
+              {% if 'usability-cost-measure' in errors %}
+                <div id="validation-usability-cost-measure" class="invalid-feedback">
+                  {{ errors['usability-cost-measure'] }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="col usability-cost-measure-parameters">
+            <div id="memory-instability-parameters">
+              <label for="memory-cost-results">Memory cost results</label>
+              <div class="form-group custom-file">
+                <label for="memory-cost-results" class="custom-file-label">Memory cost results</label>
+                <input type="file" class="form-control-file custom-file-input
+                  {% if 'memory-cost-results' in errors %}
+                    is-invalid
+                  {% endif %}
+                " name="memory-cost-results" id="memory-cost-results">
+                {% if 'memory-cost-results' in errors %}
+                  <div id="validation-memory-cost-results" class="invalid-feedback">
+                    {{ errors['memory-cost-results'] }}
+                  </div>
+                {% endif %}
+                <small class="form-text text-muted">
+                  The memory cost results as a csv file.
+                  It should contain two columns: <i>attribute</i> and <i>average_size</i>.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label for="memory-cost-weight">Memory cost weight</label>
+                <input type="text" class="form-control
+                {% if 'memory-cost-weight' in errors %}
+                  is-invalid
+                {% endif %}
+                " id="memory-cost-weight" name="memory-cost-weight" placeholder="Memory cost weight">
+                {% if 'memory-cost-weight' in errors %}
+                  <div id="validation-memory-cost-weight" class="invalid-feedback">
+                    {{ errors['memory-cost-weight'] }}
+                  </div>
+                {% endif %}
+                <small class="form-text text-muted">
+                  The weight to multiply the memory cost to obtain the equivalent cost in points.
+                </small>
+              </div>
+
+              <label for="memory-cost-results">Instability cost results</label>
+              <div class="form-group custom-file">
+                <label for="instability-cost-results" class="custom-file-label">Instability cost results</label>
+                <input type="file" class="form-control-file custom-file-input
+                  {% if 'instability-cost-results' in errors %}
+                    is-invalid
+                  {% endif %}
+                " name="instability-cost-results" id="instability-cost-results">
+                {% if 'instability-cost-results' in errors %}
+                  <div id="validation-instability-cost-results" class="invalid-feedback">
+                    {{ errors['instability-cost-results'] }}
+                  </div>
+                {% endif %}
+                <small class="form-text text-muted">
+                  The instability cost results as a csv file.
+                  It should contain two columns: <i>attribute</i> and <i>proportion_of_changes</i>.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label for="instability-cost-weight">Instability cost weight</label>
+                <input type="text" class="form-control
+                {% if 'instability-cost-weight' in errors %}
+                  is-invalid
+                {% endif %}
+                " id="instability-cost-weight" name="instability-cost-weight" placeholder="Instability cost weight">
+                {% if 'instability-cost-weight' in errors %}
+                  <div id="validation-instability-cost-weight" class="invalid-feedback">
+                    {{ errors['instability-cost-weight'] }}
+                  </div>
+                {% endif %}
+                <small class="form-text text-muted">
+                  The weight to multiply the instability cost to obtain the equivalent cost in points.
+                </small>
+              </div>
+            </div>
+
+            <div id="memory-instability-collection-time-parameters" class="invisible">
+              <label for="collection-time-cost-results">Collection time cost results</label>
+              <div class="form-group custom-file">
+                <label for="collection-time-cost-results" class="custom-file-label">Collection time cost results</label>
+                <input type="file" class="form-control-file custom-file-input
+                  {% if 'collection-time-cost-results' in errors %}
+                    is-invalid
+                  {% endif %}
+                " name="collection-time-cost-results" id="collection-time-cost-results">
+                {% if 'collection-time-cost-results' in errors %}
+                  <div id="validation-collection-time-cost-results" class="invalid-feedback">
+                    {{ errors['collection-time-cost-results'] }}
+                  </div>
+                {% endif %}
+                <small class="form-text text-muted">
+                  The collection time cost results as a csv file.
+                  It should contain three columns: <i>attribute</i>, <i>average_collection_time</i> and <i>is_asynchronous</i>.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label for="collection-time-cost-weight">Collection time cost weight</label>
+                <input type="text" class="form-control
+                {% if 'collection-time-cost-weight' in errors %}
+                  is-invalid
+                {% endif %}
+                " id="collection-time-cost-weight" name="collection-time-cost-weight" placeholder="Collection time cost weight">
+                {% if 'collection-time-cost-weight' in errors %}
+                  <div id="validation-collection-time-cost-weight" class="invalid-feedback">
+                    {{ errors['collection-time-cost-weight'] }}
+                  </div>
+                {% endif %}
+                <small class="form-text text-muted">
+                  The weight to multiply the collection time cost to obtain the equivalent cost in points.
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="col" style="text-align: center;">
+            <button type="submit" class="btn btn-primary" data-toggle="modal" data-target="#loading-screen">Launch the exploration</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- The loading screen modal -->
+  <div class="modal fade" id="loading-screen" tabindex="-1" aria-labelledby="loading-screen-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="loading-screen-label">Launching the exploration...</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body" id="loading-screen-body">
+          <p>
+            The exploration is starting, please wait.
+            This can take some time depending on the size of the fingerprint dataset.
+          </p>
+          <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+
+{% block js_libraries %}
+  <script type="text/javascript">
+
+    /**
+     * Update the number of explored paths textual display.
+     * @param newValue The new number of explored paths.
+     * @note This is only displayed when FPSelect is selected as the
+     *       exploration method.
+     */
+    function updateExploredPathsNumber(newValue) {
+      $('#explored-paths-number').text(newValue);
+    }
+
+    /**
+     * Update the number of k of the most common fingerprints to consider.
+     * @param newValue The new number set for k.
+     * @note This is only displayed when the TopKFingerprints sensitivity
+     *       measure is the one selected.
+     */
+    function updateMostCommonFingerprints(newValue) {
+      $('#most-common-fingerprints-number').text(newValue);
+    }
+
+    {% set fpselect_exploration_method = exploration_methods[0] %}
+    /**
+     * Update the accompanying parameters according to the exploration method.
+     * @param newValue The new exploration method selected.
+     */
+    function setExplorationMethod(newValue) {
+      if (newValue == '{{ fpselect_exploration_method }}')
+        setVisibleState($('#fpselect-parameters'), true);
+      else
+        setVisibleState($('#fpselect-parameters'), false);
+    }
+
+    {% set mem_inst_coll_time_usab_cost_meas = usability_cost_measures[1] %}
+    /**
+     * Update the accompanying parameters according to the selected usability
+     * cost measure.
+     * @param newValue The new usability cost measure selected.
+     */
+    function setUsabilityCostMeasure(newValue) {
+      if (newValue == '{{ mem_inst_coll_time_usab_cost_meas }}')
+        setVisibleState($('#memory-instability-collection-time-parameters'), true);
+      else
+        setVisibleState($('#memory-instability-collection-time-parameters'), false);
+    }
+
+    {% set mem_inst_usab_cost_meas = usability_cost_measures[0] %}
+    // Set the default parameters
+    $('#exploration-method').val('{{ fpselect_exploration_method }}');
+    $('#usability-cost-measure').val('{{ mem_inst_usab_cost_meas }}');
+    $('#explored-paths').val({{ params.getint('WebServer', 'fpselect_default_explored_paths') }});
+    $('#most-common-fingerprints').val({{ params.getint('WebServer', 'top_k_fingerprints_sensitivity_measure_default_k') }});
+  </script>
+{% endblock %}

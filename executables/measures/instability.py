@@ -6,7 +6,7 @@ from os import path
 
 from loguru import logger
 
-from brfast.data import FingerprintDatasetFromCSVFile
+from brfast.data.dataset import FingerprintDatasetFromCSVFile
 from brfast.measures.usability_cost.instability import ProportionOfChanges
 
 

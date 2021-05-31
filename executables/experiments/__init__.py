@@ -6,7 +6,7 @@ from typing import Dict
 
 from loguru import logger
 
-from brfast.data import Attribute, AttributeSet
+from brfast.data.attribute import Attribute, AttributeSet
 
 
 def read_csv_analysis_as_dict(csv_file_path: str,

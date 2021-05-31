@@ -1,9 +1,110 @@
 [DataAnalysis]
+  ; The data analysis engine
+  ; Choices: pandas, modin.pandas
+  engine = pandas
 
-; The data analysis engine
-; Choices: pandas, modin.pandas
-engine = pandas
+  ; The modin engine, used when the selected data analysis engine is
+  ; modin.pandas. See https://modin.readthedocs.io for the available engines.
+  ; Choices: dask, ray
+  modin_engine = ray
 
-; The modin engine, used when the selected data analysis engine is modin.pandas
-; Choices: dask, ray
-modin_engine = ray
+
+[Multiprocessing]
+  ; This section is dedicated to the activation of multiprocessing which
+  ; increases the memory consumption but reduces the computation time.
+
+  ; The number of cores let available to the other processes running on the
+  ; system. Note that using multiprocessing will take at least one core.
+  free_cores = 1
+
+  ; Use multiprocessing when available to compute the measures
+  measures = true
+
+  ; Use multiprocessing when available to process the explorations
+  explorations = true
+
+
+[WebServer]
+  ; The UPLOAD_FOLDER parameter of Flask where it saves the uploaded files
+  upload_folder = /tmp
+
+  ; The size of the secret key used by Flask in bytes
+  secret_key_size = 32
+
+  ; The number of fingerprints to show in the attribute set information page
+  fingerprint_sample_size = 10
+
+  ; The classes of the progress bars of Bootstrap
+  bootstrap_progess_bars = bg
+    bg-success
+    bg-info
+    bg-warning
+    bg-danger
+
+  ; Mapping from the flash categories of Flask to the alert class of Bootstrap
+  flash_error_class = danger
+  flash_warning_class = warning
+  flash_info_class = info
+  flash_success_class = success
+
+  ; The range of the number of explored paths to consider for the FPSelect
+  ; exploration method. The minimum is required to be a positive integer.
+  fpselect_default_explored_paths = 3
+  fpselect_minimum_explored_paths = 1
+  fpselect_maximum_explored_paths = 10
+  fpselect_step_explored_paths = 1
+
+  ; The range of the common fingerprints to consider for the TopKFingerprints
+  ; sensitivity measure. The minimum is required to be a strictly positive
+  ; integer.
+  top_k_fingerprints_sensitivity_measure_default_k = 5
+  top_k_fingerprints_sensitivity_measure_min_k = 1
+  top_k_fingerprints_sensitivity_measure_max_k = 25
+  top_k_fingerprints_sensitivity_measure_step_k = 1
+
+
+[VisualizationParameters]
+  ; The precision of float values shown dynamically using JavaScript
+  float_precision = 3
+
+  ; The step (i.e., how many attribute sets are collected every x seconds)
+  collected_nodes_step = 25
+
+  ; The collect frequency (i.e., the time in milliseconds after which we
+  ; collect the next attribute sets).
+  collect_frequency = 2000
+
+  ; The limit on the number of displayed nodes for performance reasons.
+  ; NOTE: This is not used for now.
+  nodes_limit = 50
+
+  ; The width, opacity and colour of the links
+  link_width = 2
+  link_opacity = 0.7
+  link_colour = grey
+
+  ; The radius of the nodes and the multiplicator for the radius where the
+  ; collision forces apply.
+  node_radius = 7
+  node_collision_radius_multiplicator = 2
+
+
+[NodeColour]
+  ; The colour of the nodes given their state
+  ; Simply explored
+  explored = blue
+
+  ; Pruned (i.e., stop the exploration of their supersets)
+  pruned = orange
+
+  ; The current best solution
+  best_solution = red
+
+  ; Those that satisfy the sensitivity threshold
+  satisfying_sensitivity = green
+
+  ; The starting empty node
+  empty_node = cyan
+
+  ; The default color if a node is in an unknown state
+  default = blue
