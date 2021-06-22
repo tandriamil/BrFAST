@@ -7,10 +7,9 @@ sortedcontainers==2.4.0
 Flask==2.0.1
 
 # Dataset processing libraries
-# modin[all]==0.9.1  # The ray engine generates errors during installation
-modin[dask]==0.9.1
-pandas==1.2.3
-scipy==1.6.3
+modin[all]==0.10.0
+pandas==1.2.4
+scipy==1.7.0
 
 # Testing and automated documentation generation
 coverage==5.5
