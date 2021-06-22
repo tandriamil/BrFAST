@@ -86,8 +86,26 @@
     <!-- Bootstrap Bundle with Popper -->
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Parameters -->
+    <!-- Global utility functions -->
+    <script type="text/javascript">
+      /**
+       * An utility function to set the visibility state of an element.
+       * @param element The element for which to set the visibility state.
+       * @param visibile Whether this element should be visible or not.
+       */
+      function setVisibleState(element, visible) {
+        if (visible) {
+          element.addClass('visible');
+          element.removeClass('invisible');
+        } else {
+          element.addClass('invisible');
+          element.removeClass('visible');
+        }
+      }
+    </script>
+
     {% if javascript_parameters %}
+    <!-- Parameters -->
     <script type="text/javascript">
       // The precision of the floating point numbers shown
       const FLOAT_PRECISION = {{ javascript_parameters.get('VisualizationParameters', 'float_precision') }};
@@ -124,21 +142,6 @@
       const LINK_COLOUR = "{{ javascript_parameters.get('VisualizationParameters', 'link_colour') }}";
       const NODE_RADIUS = {{ javascript_parameters.get('VisualizationParameters', 'node_radius') }};
       const NODE_COLLISION_RADIUS_MULTIPLICATOR = {{ javascript_parameters.get('VisualizationParameters', 'node_collision_radius_multiplicator') }};
-
-      /**
-       * An utility function to set the visibility state of an element.
-       * @param element The element for which to set the visibility state.
-       * @param visibile Whether this element should be visible or not.
-       */
-      function setVisibleState(element, visible) {
-        if (visible) {
-          element.addClass('visible');
-          element.removeClass('invisible');
-        } else {
-          element.addClass('invisible');
-          element.removeClass('visible');
-        }
-      }
     </script>
     {% endif %}
 
