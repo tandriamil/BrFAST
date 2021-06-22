@@ -90,13 +90,22 @@ if 'params' not in locals():
         success_message='Setting Multiprocessing.explorations = '
                         f'{multiprocessing_explorations}')
 
+    # DO NOT use multiprocessing if modin is used. It generates errors and
+    # provide no gain as modin already executes the processes in parallel
+    if analysis_engine == 'modin.pandas':
+        logger.warning('Modin is used, hence we desactivate homemade '
+                       'multiprocessing')
+        logger.warning('Updating Multiprocessing.measures to False')
+        logger.warning('Updating Multiprocessing.explorations to False')
+        multiprocessing_measures = multiprocessing_explorations = False
+
     # ===== WebServer section
     # The upload folder where to save the temporary files
     upload_foler = params.get('WebServer', 'upload_folder')
     check_parameter(
         Path(upload_foler).is_dir(),
         f'The upload folder {upload_foler} of the web server does not exist',
-        f'Using the uplaod folder {upload_foler}')
+        f'Using the upload folder {upload_foler}')
 
     # The size of the secret key for some functionalities of the WebServer
     secret_key_size = params.getint('WebServer', 'secret_key_size')

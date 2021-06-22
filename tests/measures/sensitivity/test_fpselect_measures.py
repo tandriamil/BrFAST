@@ -42,7 +42,8 @@ class TestGetTopKFingerprintsFunction(unittest.TestCase):
             expected_dataframe[attribute] = expected_dataframe[
                 attribute].astype(source_type)
 
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_frame_type=False)  # As modin can be used
 
     def test_top_1_fingerprint(self):
         # Rows seem to be sorted : (Chrome, 100, 1) is then first...
@@ -55,7 +56,8 @@ class TestGetTopKFingerprintsFunction(unittest.TestCase):
             self._dataset.dataframe, self._attribute_names, 1)
         if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_frame_type=False)  # As modin can be used
 
     def test_top_3_fingerprints_non_uniques(self):
         # Rows seem to be sorted : (Chrome, 1) is then before (Edge, 1)
@@ -71,7 +73,8 @@ class TestGetTopKFingerprintsFunction(unittest.TestCase):
             self._dataset.dataframe, attribute_names, 3)
         if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_frame_type=False)  # As modin can be used
 
     def test_top_42_fingerprints_non_uniques(self):
         # Rows seem to be sorted : (Chrome, 1) is then before (Edge, 1)
@@ -87,7 +90,8 @@ class TestGetTopKFingerprintsFunction(unittest.TestCase):
             self._dataset.dataframe, attribute_names, 42)
         if params['DataAnalysis']['engine'] == 'modin.pandas':
             resulting_dataframe = resulting_dataframe._to_pandas()
-        assert_frame_equal(resulting_dataframe, expected_dataframe)
+        assert_frame_equal(resulting_dataframe, expected_dataframe,
+                           check_frame_type=False)  # As modin can be used
 
 
 class TopKFingerprintsCleanDataset(unittest.TestCase):

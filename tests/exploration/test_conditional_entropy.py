@@ -230,6 +230,11 @@ class TestConditionalEntropy(TestExploration):
 class TestConditionalEntropyMultiprocessing(TestConditionalEntropy):
 
     def setUp(self):
+        # If we use the modin engine, we ignore the multiprocessing test as it
+        # is incompatible with modin
+        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+            self.skipTest()
+
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()
         self._usability_cost_measure = DummyUsabilityCostMeasure()

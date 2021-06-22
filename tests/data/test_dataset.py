@@ -115,7 +115,8 @@ class TestFingerprintDataset(unittest.TestCase):
             [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
             inplace=True)
 
-        assert_frame_equal(dataset.dataframe, comparison_dataframe)
+        assert_frame_equal(dataset.dataframe, comparison_dataframe,
+                           check_frame_type=False)  # As modin can be used
         with self.assertRaises(AttributeError):
             dataset.dataframe = pd.DataFrame()
 
@@ -162,11 +163,12 @@ class TestFingerprintDataset(unittest.TestCase):
             last_fingerprint=last_fingerprint)
         self.assertIsInstance(df_w_1_fp_p_bswr, pd.DataFrame)
         self.assertEqual(len(df_w_1_fp_p_bswr), len(expected_dataframe))
-        assert_frame_equal(df_w_1_fp_p_bswr, expected_dataframe)
+        assert_frame_equal(df_w_1_fp_p_bswr, expected_dataframe,
+                           check_frame_type=False)  # As modin can be used
         # Just to check that the caching works fine we call this two times
         assert_frame_equal(dataset.get_df_w_one_fp_per_browser(
-            last_fingerprint=last_fingerprint),
-                           expected_dataframe)
+            last_fingerprint=last_fingerprint), expected_dataframe,
+                           check_frame_type=False)  # As modin can be used
 
     def test_get_df_w_one_fp_per_browser_first_fingerprint(self):
         self.check_one_fp_per_browser(self._dummy_fp_dataset,
