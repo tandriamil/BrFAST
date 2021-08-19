@@ -185,7 +185,7 @@
 
 {% block js_libraries %}
   <!-- D3.js -->
-  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.6.2/d3.min.js"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='d3.min.js') }}"></script>
 
   <!-- JS script for the dynamic visualization of the lattice -->
   <script type="text/javascript" src="{{ url_for('static', filename='dynamic-visualization.js') }}"></script>

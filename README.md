@@ -417,7 +417,7 @@ com
 ## Acknowledgments
 
 I developed this project when I was a Temporary Teaching and Research Associate
-at the University of Rennes 1 and at the IRISA laboratory in the DRUID team.
+at the [University of Rennes 1](https://www.univ-rennes1.fr) and at the [IRISA](https://www.irisa.fr) laboratory in the [DRUID](https://www-druid.irisa.fr) team.
 
 
 <div>

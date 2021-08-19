@@ -8,10 +8,10 @@
     <meta name="author" content="Nampoina Andriamilanto">
 
     <!-- Bootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/css/bootstrap.min.css" type = "text/css" rel="stylesheet" />
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}" />
 
     <!-- Bootstrap fonts -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.4.1/font/bootstrap-icons.min.css">
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='bootstrap-icons.min.css') }}">
 
     <!-- My own styles -->
     <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
@@ -81,10 +81,10 @@
 
     <!-- ####################### Import JS libraries ####################### -->
     <!-- JQuery (needed for Bootstrap) -->
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='jquery.min.js') }}"></script>
 
     <!-- Bootstrap Bundle with Popper -->
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
 
     <!-- Global utility functions -->
     <script type="text/javascript">
