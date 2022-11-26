@@ -3,8 +3,5 @@ source =
     brfast
 
 omit =
-    # Ignore the python files in the virtual environment
-    venv/*
-
     # Ignore the test files which are used for the test
     tests/*

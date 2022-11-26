@@ -86,32 +86,19 @@ Python3.8 and Python3.9**.
 
 ### Installation
 
-1. Clone this repository.
-   ```sh
-   git clone https://github.com/tandriamil/BrFAST
-   ```
+```shell
+# Clone this repository.
+git clone https://github.com/tandriamil/BrFAST
 
-2. Create a virtual environment (not mandatory but recommended).
-   ```sh
-   # The virtual environment is created in a directory named "venv"
-   python3 -m venv venv
-   ```
+# Install poetry
+pip3 install poetry
 
-3. Enter the scope of the virtual environment.
-   ```sh
-   source venv/bin/activate
-   ```
+# Install the brfast module using poetry
+poetry install
 
-4. Install the dependencies.
-   ```sh
-   pip install -r requirements.txt
-   ```
-
-5. Copy the `config.ini.template` to `config.ini` to use the default
-   configuration. You can edit this file to meet your needs.
-   ```sh
-   cp config.ini.template config.ini
-   ```
+# Copy the default configuration (you can edit it to meet your needs)
+cp config.ini.template config.ini
+```
 
 
 
@@ -138,8 +125,8 @@ measures in the `assets/data/[dataset]-measures` directories.
 **Average attribute size**
 
 To compute the average size of the attributes of a fingerprint dataset:
-```sh
-python -m executables.measures.memory input_dataset output_file
+```shell
+poetry run python -m executables.measures.memory input_dataset output_file
 ```
 
 - `input_dataset`: The path to the browser fingerprint dataset as a csv file.
@@ -149,8 +136,8 @@ python -m executables.measures.memory input_dataset output_file
 **Average attribute instability**
 
 To compute the average instability of the attributes of a fingerprint dataset:
-```sh
-python -m executables.measures.instability input_dataset output_file
+```shell
+poetry run python -m executables.measures.instability input_dataset output_file
 ```
 
 - `input_dataset`: The path to the browser fingerprint dataset as a csv file.
@@ -169,8 +156,8 @@ The simple dummy example runs the example shown in our
 and the measures are hard-written in the code. You can still execute it to
 check that BrFAST runs fine.
 
-```sh
-python -m executables.experiments.dummy_fpselect_example
+```shell
+poetry run python -m executables.experiments.dummy_fpselect_example
 ```
 
 
@@ -178,8 +165,8 @@ python -m executables.experiments.dummy_fpselect_example
 
 The script named `single_execution.py` processes a single execution:
 
-```sh
-python -m executables.experiments.single_execution [options] input_data_dir
+```shell
+poetry run python -m executables.experiments.single_execution [options] input_data_dir
 ```
 
 The required positional argument `input_data_dir` should point to a directory
@@ -215,8 +202,8 @@ measures or your owns.
 
 The script named `multiple_executions.py` processes multiple executions.
 
-```sh
-python -m executables.experiments.multiple_executions
+```shell
+poetry run python -m executables.experiments.multiple_executions
 ```
 
 It takes a list of values for each parameter and processes the exploration
@@ -240,7 +227,7 @@ application. This application proposes two modes: trace replay and real time
 exploration. We detail below how to start and use the web application.
 
 1. Set the environment variables of Flask:
-  ```sh
+  ```shell
   export FLASK_APP=brfast.webserver.application
 
   # The following is optional and shows verbose logs when errors are encountered
@@ -249,19 +236,15 @@ exploration. We detail below how to start and use the web application.
   # The following is optional and reloads the application after each edit
   # export FLASK_ENV=development
   ```
-
 2. Run the Flask application:
-  ```sh
-  python -m flask run
+  ```shell
+  poetry run python -m flask run
 
   # You can specify a port if you run several applications
-  # python -m flask run --port 5001
+  # poetry run python -m flask run --port 5001
   ```
-
 3. Open you web browser to the [default home page](http://127.0.0.1:5000).
-
 4. Choose a mode between trace replay and real time exploration.
-
 5. Fill the form with the necessary information and files. Submit the form when
    it is done.
 
@@ -302,21 +285,21 @@ The visualization page displays
 
 You can execute the tests by:
 
-```sh
-python -m unittest discover -s tests
+```shell
+poetry run python -m unittest discover -s tests
 ```
 
 You can generate the coverage report in `htmlcol` (open `index.html`) by:
 
-```sh
-coverage run -m unittest discover -s tests
-coverage html
+```shell
+poetry run coverage run -m unittest discover -s tests
+poetry run coverage html
 ```
 
 You can generate the documentation in `html` (open `brfast/index.html`) by:
 
-```sh
-pdoc --html brfast
+```shell
+poetry run pdoc -d google -o html brfast
 ```
 
 
