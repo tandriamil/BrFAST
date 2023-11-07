@@ -10,17 +10,18 @@ license = "MIT License"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-loguru = "^0.6.0"
-pandas = "^1.5.2"
-python-dateutil = "^2.8.2"
-scipy = "^1.9.3"
-sortedcontainers = "^2.4.0"
-flask = "^2.2.2"
+python = "^3.11,<3.13"
+dask = "2023.10.1"
+flask = "3.0.0"
+loguru = "0.7.2"
+pandas = "2.1.2"
+python-dateutil = "2.8.2"
+scipy = "1.11.3"
+sortedcontainers = "2.4.0"
 
 [tool.poetry.group.dev.dependencies]
-coverage = "^6.5.0"
-pdoc = "^12.3.0"
+coverage = "^7.3.2"
+pdoc = "^14.1.0"
 
 [build-system]
 requires = ["poetry-core"]
