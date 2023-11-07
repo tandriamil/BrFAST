@@ -35,7 +35,7 @@
   fingerprint_sample_size = 10
 
   ; The classes of the progress bars of Bootstrap
-  bootstrap_progess_bars = bg
+  bootstrap_progress_bars = bg
     bg-success
     bg-info
     bg-warning
@@ -83,10 +83,10 @@
   link_opacity = 0.7
   link_colour = grey
 
-  ; The radius of the nodes and the multiplicator for the radius where the
+  ; The radius of the nodes and the multiplier for the radius where the
   ; collision forces apply.
   node_radius = 7
-  node_collision_radius_multiplicator = 2
+  node_collision_radius_multiplier = 2
 
 
 [NodeColour]

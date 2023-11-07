@@ -19,7 +19,6 @@ MODIN_ENGINES = ['ray', 'dask']
 def check_parameter(verification: bool, error_message: Optional[str] = '',
                     success_message: Optional[str] = ''):
     """Check a parameter and exist if the parameter is incorrect.
-
     If the parameter is incorrect, we end the execution.
 
     Args:
@@ -96,7 +95,7 @@ if 'params' not in locals():
     # DO NOT use multiprocessing if modin is used. It generates errors and
     # provide no gain as modin already executes the processes in parallel
     if analysis_engine == 'modin.pandas':
-        logger.warning('Modin is used, hence we desactivate homemade '
+        logger.warning('Modin is used, hence we deactivate homemade '
                        'multiprocessing')
         logger.warning('Updating Multiprocessing.measures to False')
         logger.warning('Updating Multiprocessing.explorations to False')
@@ -104,11 +103,11 @@ if 'params' not in locals():
 
     # ===== WebServer section
     # The upload folder where to save the temporary files
-    upload_foler = params.get('WebServer', 'upload_folder')
+    upload_folder = params.get('WebServer', 'upload_folder')
     check_parameter(
-        Path(upload_foler).is_dir(),
-        f'The upload folder {upload_foler} of the web server does not exist',
-        f'Using the upload folder {upload_foler}')
+        Path(upload_folder).is_dir(),
+        f'The upload folder {upload_folder} of the web server does not exist',
+        f'Using the upload folder {upload_folder}')
 
     # The size of the secret key for some functionalities of the WebServer
     secret_key_size = params.getint('WebServer', 'secret_key_size')
@@ -128,13 +127,13 @@ if 'params' not in locals():
         f'{fingerprint_sample_size}')
 
     # The name of the classes of the bootstrap progress bars
-    bootstrap_progess_bars = params.get('WebServer', 'bootstrap_progess_bars')
-    bootstrap_progess_bars_as_list = bootstrap_progess_bars.splitlines()
+    bootstrap_progress_bars = params.get('WebServer', 'bootstrap_progress_bars')
+    bootstrap_progress_bars_as_list = bootstrap_progress_bars.splitlines()
     check_parameter(
-        len(bootstrap_progess_bars_as_list) > 0,
+        len(bootstrap_progress_bars_as_list) > 0,
         'The bootstrap progress bars should contain at least one class',
-        'Setting WebServer.bootstrap_progess_bars = '
-        f'{", ".join(bootstrap_progess_bars_as_list)}')
+        'Setting WebServer.bootstrap_progress_bars = '
+        f'{", ".join(bootstrap_progress_bars_as_list)}')
 
     # The mapping between the flash classes of Flask and the alert classes of
     # bootstrap
@@ -142,7 +141,7 @@ if 'params' not in locals():
         flash_class_name = f'flash_{flash_class}_class'
         class_value = params.get('WebServer', flash_class_name)
         check_parameter(
-            class_value,
+            bool(class_value),
             success_message=f'Setting WebServer.{flash_class_name} = '
                             f'{class_value}')
 
@@ -290,7 +289,7 @@ if 'params' not in locals():
     # The colour of the links of the visualization graph
     link_colour = params.get('VisualizationParameters', 'link_colour')
     check_parameter(
-        link_colour,
+        bool(link_colour),
         success_message='Setting VisualizationParameters.link_colour = '
                         f'{link_colour}')
 
@@ -301,16 +300,16 @@ if 'params' not in locals():
         'The node radius should be a strictly positive integer',
         f'Setting VisualizationParameters.node_radius = {node_radius}')
 
-    # The multiplicator for the radius of the nodes of the visualization graph
-    # used to generate the collision radius
-    node_collision_radius_multiplicator = params.getfloat(
-        'VisualizationParameters', 'node_collision_radius_multiplicator')
+    # The multiplier for the radius of the nodes of the visualization graph used
+    # to generate the collision radius
+    node_collision_radius_multiplier = params.getfloat(
+        'VisualizationParameters', 'node_collision_radius_multiplier')
     check_parameter(
-        node_collision_radius_multiplicator > 0,
-        'The node collision radius multiplicator should be a strictly '
+        node_collision_radius_multiplier > 0,
+        'The node collision radius multiplier should be a strictly '
         'positive float',
-        'Setting VisualizationParameters.node_collision_radius_multiplicator ='
-        f' {node_collision_radius_multiplicator}')
+        'Setting VisualizationParameters.node_collision_radius_multiplier ='
+        f' {node_collision_radius_multiplier}')
 
     # ===== NodeColour section
     # The mapping between each attribute set state and its colour
@@ -318,5 +317,5 @@ if 'params' not in locals():
                   'satisfying_sensitivity', 'empty_node', 'default']:
         state_colour = params.get('NodeColour', state)
         check_parameter(
-            state_colour,
+            bool(state_colour),
             success_message=f'Setting NodeColour.{state} = {state_colour}')

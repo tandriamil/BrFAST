@@ -227,22 +227,22 @@ application. This application proposes two modes: trace replay and real time
 exploration. We detail below how to start and use the web application.
 
 1. Set the environment variables of Flask:
-  ```shell
-  export FLASK_APP=brfast.webserver.application
-
-  # The following is optional and shows verbose logs when errors are encountered
-  # export FLASK_ENV=debug
-
-  # The following is optional and reloads the application after each edit
-  # export FLASK_ENV=development
-  ```
+   ```shell
+   export FLASK_APP=brfast.webserver.application
+    
+   # The following is optional and shows verbose logs when errors are encountered
+   # export FLASK_ENV=debug
+   
+   # The following is optional and reloads the application after each edit
+   # export FLASK_ENV=development
+   ```
 2. Run the Flask application:
-  ```shell
-  poetry run python -m flask run
+   ```shell
+   poetry run python -m flask run
 
-  # You can specify a port if you run several applications
-  # poetry run python -m flask run --port 5001
-  ```
+   # You can specify a port if you run several applications
+   # poetry run python -m flask run --port 5001
+   ```
 3. Open you web browser to the [default home page](http://127.0.0.1:5000).
 4. Choose a mode between trace replay and real time exploration.
 5. Fill the form with the necessary information and files. Submit the form when

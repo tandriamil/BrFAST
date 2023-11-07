@@ -112,7 +112,7 @@
 
       // The classes for the progress bars
       const PROGRESS_BAR_CLASSES = [
-        {% for progress_bar_class in javascript_parameters.get('WebServer', 'bootstrap_progess_bars').splitlines() %}
+        {% for progress_bar_class in javascript_parameters.get('WebServer', 'bootstrap_progress_bars').splitlines() %}
           "{{ progress_bar_class }}",
         {% endfor %}
       ];
@@ -141,7 +141,7 @@
       const LINK_OPACITY = {{ javascript_parameters.get('VisualizationParameters', 'link_opacity') }};
       const LINK_COLOUR = "{{ javascript_parameters.get('VisualizationParameters', 'link_colour') }}";
       const NODE_RADIUS = {{ javascript_parameters.get('VisualizationParameters', 'node_radius') }};
-      const NODE_COLLISION_RADIUS_MULTIPLICATOR = {{ javascript_parameters.get('VisualizationParameters', 'node_collision_radius_multiplicator') }};
+      const NODE_COLLISION_RADIUS_MULTIPLICATOR = {{ javascript_parameters.get('VisualizationParameters', 'node_collision_radius_multiplier') }};
     </script>
     {% endif %}
 

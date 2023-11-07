@@ -704,14 +704,14 @@ def attribute_set_information(attribute_set_id: int):
             REAL_TIME_EXPLORATION.get_explored_attribute_sets(0, 1)[0])
     elif TRACE_DATA:
         candidate_attributes_infos = TRACE_DATA['exploration'][0]
-    bootstrap_progess_bars = (params
-                              .get('WebServer', 'bootstrap_progess_bars')
+    bootstrap_progress_bars = (params
+                              .get('WebServer', 'bootstrap_progress_bars')
                               .splitlines())
 
     # The total usability cost
     cost_percentage = (100 * attribute_set_infos['usability_cost']
                        / candidate_attributes_infos['usability_cost'])
-    usability_cost_ratio['usability'] = (bootstrap_progess_bars[0],
+    usability_cost_ratio['usability'] = (bootstrap_progress_bars[0],
                                          '%.2f' % cost_percentage)
 
     if attribute_set_id > -1:
@@ -726,8 +726,8 @@ def attribute_set_information(attribute_set_id: int):
                 100 * attribute_set_infos['cost_explanation'][cost_dimension]
                 / cost_value)
             usability_cost_ratio[cost_dimension] = (
-                bootstrap_progess_bars[
-                    progress_bar_class_id % len(bootstrap_progess_bars)],
+                bootstrap_progress_bars[
+                    progress_bar_class_id % len(bootstrap_progress_bars)],
                 '%.2f' % cost_percentage)
             progress_bar_class_id += 1
 
