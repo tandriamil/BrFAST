@@ -4,6 +4,7 @@
 import configparser
 import os
 import sys
+import threading
 from pathlib import Path, PurePath
 from typing import Optional
 
@@ -27,7 +28,9 @@ def check_parameter(verification: bool, error_message: Optional[str] = '',
                    incorrect.
     success_message: The message to display if everything is fine.
     """
-    if verification:
+    if all((verification,
+            threading.current_thread() is not threading.main_thread())):
+        # Only display on the main thread to avoid having too many logs
         logger.debug(success_message)
     else:
         logger.error(error_message)
