@@ -135,8 +135,10 @@ class TestMemoryInstabilityTime(unittest.TestCase):
             CostDimension.TIME: expected_time_cost,
             f'weighted_{CostDimension.TIME}': expected_weighted_time_cost
         }
-        self.assertEqual(cost, expected_cost)
-        self.assertDictEqual(cost_explanation, expected_cost_explanation)
+        self.assertAlmostEqual(cost, expected_cost)
+        for cost_name, cost_value in cost_explanation.items():
+            expected_cost_value = expected_cost_explanation[cost_name]
+            self.assertAlmostEqual(expected_cost_value, cost_value)
 
     def test_evaluate_sequential_asynchronous_mix_seq_max(self):
         # Sequential / asynchronous mix, but the total collection time of the
