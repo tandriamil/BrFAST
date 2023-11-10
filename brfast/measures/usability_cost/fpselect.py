@@ -8,7 +8,7 @@ from brfast.measures import UsabilityCostMeasure
 
 
 class CostDimension:
-    """Class reprensenting the cost dimensions."""
+    """Class representing the cost dimensions."""
 
     MEMORY = 'memory'
     INSTABILITY = 'instability'
@@ -31,7 +31,7 @@ class MemoryInstability(UsabilityCostMeasure):
 
     def __init__(self, size: Dict[Attribute, float],
                  instability: Dict[Attribute, float],
-                 weights: Dict[Attribute, float]):
+                 weights: Dict[str, float]):
         """Initialize the cost measure that considers memory and instability.
 
         Args:
@@ -79,16 +79,16 @@ class MemoryInstability(UsabilityCostMeasure):
         """
         memory_cost, weighted_memory_cost = self._compute_memory_cost(
             attribute_set)
-        instability_cost, weighted_instab_cost = (
+        instability_cost, weighted_instability_cost = (
             self._compute_instability_cost(attribute_set))
-        total_cost = weighted_memory_cost + weighted_instab_cost
+        total_cost = weighted_memory_cost + weighted_instability_cost
         cost_explanation = {
             CostDimension.MEMORY: memory_cost,
             f'weighted_{CostDimension.MEMORY}': weighted_memory_cost,
             CostDimension.INSTABILITY: instability_cost,
-            f'weighted_{CostDimension.INSTABILITY}': weighted_instab_cost
+            f'weighted_{CostDimension.INSTABILITY}': weighted_instability_cost
         }
-        return (total_cost, cost_explanation)
+        return total_cost, cost_explanation
 
     def _compute_memory_cost(self, attribute_set: AttributeSet
                              ) -> (float, float):
@@ -103,7 +103,7 @@ class MemoryInstability(UsabilityCostMeasure):
         memory_cost = sum(self._size[attribute] for attribute in attribute_set)
         weighted_memory_cost = (memory_cost
                                 * self._weights[CostDimension.MEMORY])
-        return (memory_cost, weighted_memory_cost)
+        return memory_cost, weighted_memory_cost
 
     def _compute_instability_cost(self, attribute_set: AttributeSet
                                   ) -> (float, float):
@@ -119,7 +119,7 @@ class MemoryInstability(UsabilityCostMeasure):
                                for attribute in attribute_set)
         weighted_instability_cost = (
             instability_cost * self._weights[CostDimension.INSTABILITY])
-        return (instability_cost, weighted_instability_cost)
+        return instability_cost, weighted_instability_cost
 
 
 class MemoryInstabilityTime(MemoryInstability):
@@ -134,7 +134,7 @@ class MemoryInstabilityTime(MemoryInstability):
     def __init__(self, size: Dict[Attribute, float],
                  instability: Dict[Attribute, float],
                  time: Dict[Attribute, Tuple[float, bool]],
-                 weights: Dict[Attribute, float]):
+                 weights: Dict[str, float]):
         """Initialize the cost measure (memory, instability, and col. time).
 
         Args:
@@ -166,21 +166,21 @@ class MemoryInstabilityTime(MemoryInstability):
         """
         memory_cost, weighted_memory_cost = self._compute_memory_cost(
             attribute_set)
-        instability_cost, weighted_instab_cost = (
+        instability_cost, weighted_instability_cost = (
             self._compute_instability_cost(attribute_set))
         col_time_cost, weighted_col_time_cost = self._compute_time_cost(
             attribute_set)
-        total_cost = sum((weighted_memory_cost, weighted_instab_cost,
+        total_cost = sum((weighted_memory_cost, weighted_instability_cost,
                           weighted_col_time_cost))
         cost_explanation = {
             CostDimension.MEMORY: memory_cost,
             f'weighted_{CostDimension.MEMORY}': weighted_memory_cost,
             CostDimension.INSTABILITY: instability_cost,
-            f'weighted_{CostDimension.INSTABILITY}': weighted_instab_cost,
+            f'weighted_{CostDimension.INSTABILITY}': weighted_instability_cost,
             CostDimension.TIME: col_time_cost,
             f'weighted_{CostDimension.TIME}': weighted_col_time_cost
         }
-        return (total_cost, cost_explanation)
+        return total_cost, cost_explanation
 
     def _compute_time_cost(self, attribute_set: AttributeSet
                            ) -> (float, float):
@@ -205,4 +205,4 @@ class MemoryInstabilityTime(MemoryInstability):
                                    max_asynchronous_col_time)
         weighted_collection_time_cost = (
             collection_time_cost * self._weights[CostDimension.TIME])
-        return (collection_time_cost, weighted_collection_time_cost)
+        return collection_time_cost, weighted_collection_time_cost

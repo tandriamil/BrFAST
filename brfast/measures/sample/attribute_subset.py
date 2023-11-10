@@ -19,7 +19,7 @@ class AttributeSetSample(Analysis):
             dataset: The fingerprint dataset to analyze.
             attributes: The attributes to consider.
             sample_size: The size of the sample that we are interested in,
-                         reqired to be strictly positive.
+                         required to be strictly positive.
 
         Raises:
             AttributeError: The sample size is required to be a strictly
@@ -61,8 +61,7 @@ class AttributeSetSample(Analysis):
             A list of rows, each row being a list of values to store. The first
             row should contain the headers.
         """
-        row_list = []
-        row_list.append(self._dataset.candidate_attributes.attribute_names)
+        row_list = [self._dataset.candidate_attributes.attribute_names]
         for fingerprint in self._result.values():
             row_list.append(fingerprint)
         return row_list

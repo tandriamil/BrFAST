@@ -8,7 +8,6 @@ from statistics import mean
 from brfast.data.attribute import AttributeSet
 from brfast.measures.usability_cost.memory import (
     _compute_attribute_avg_size, AverageFingerprintSize)
-
 from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
                         DummyFingerprintDataset)
 

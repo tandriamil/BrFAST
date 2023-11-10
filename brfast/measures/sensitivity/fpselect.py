@@ -6,13 +6,14 @@ from typing import List
 
 from loguru import logger
 
+from brfast.config import params
 from brfast.data.attribute import AttributeSet
 from brfast.data.dataset import FingerprintDataset
 from brfast.measures import SensitivityMeasure
+
 # from measures.similarity import TODO
 
 # Import the engine of the analysis module (pandas or modin)
-from brfast.config import params
 pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 PROPORTION_FIELD = 'proportion'
@@ -32,7 +33,7 @@ def _get_top_k_fingerprints(dataframe: pd.DataFrame,
         A DataFrame with only the most common fingerprints together with the
         proportion of the users that share them.
     """
-    # Project the datafame on the wanted attributes
+    # Project the dataframe on the wanted attributes
     projected_dataframe = dataframe[attribute_names]
 
     # Store the current dtypes of each column (needed to put back the dtypes,
@@ -62,7 +63,7 @@ def _get_top_k_fingerprints(dataframe: pd.DataFrame,
 
 
 # class SimilarAttributes(SensitivityMeasure):
-#     """The sensivity measure used in the FPSelect paper.
+#     """The sensitivity measure used in the FPSelect paper.
 #
 #     This sensitivity measure considers that the impersonated users are those
 #     that have a fingerprint that is similar to the one of the k-most common
@@ -73,7 +74,7 @@ def _get_top_k_fingerprints(dataframe: pd.DataFrame,
 #     def __init__(self, fingerprint_dataset: FingerprintDataset,
 #                  most_common_fps: int,
 #                  attr_dist_info: Dict[str, Dict[str, Any]]):
-#         """Initialize the sensivity measure used in the FPSelect paper.
+#         """Initialize the sensitivity measure used in the FPSelect paper.
 #
 #         Args:
 #             dataset: The fingerprint dataset.
@@ -145,7 +146,7 @@ class TopKFingerprints(SensitivityMeasure):
         """Initialize the top-k simple sensitivity measure.
 
         Args:
-            dataset: The fingerprint dataset.
+            fingerprint_dataset: The fingerprint dataset.
             most_common_fps: The number of the most common fingerprints that we
                              should consider.
         """

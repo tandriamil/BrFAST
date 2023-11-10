@@ -7,7 +7,6 @@ from itertools import product
 from brfast.webserver.form_validation import (
     allowed_extension, ALLOWED_EXTENSIONS)
 
-
 FILENAME_BASE = 'file.%s'
 FILENAME_WITHOUT_EXTENSION = 'filename_without_extension'
 RANDOM_UNALLOWED_EXTENSIONS = {'php', 'png', 'txt'}

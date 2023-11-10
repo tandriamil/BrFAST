@@ -12,6 +12,7 @@ from brfast.config import ANALYSIS_ENGINES, params
 from brfast.data.attribute import AttributeSet
 from brfast.data.dataset import FingerprintDataset
 from brfast.measures import Analysis
+
 pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 
@@ -55,15 +56,15 @@ def attribute_set_entropy(df_one_fp_per_browser: pd.DataFrame,
                        'function.')
         df_one_fp_per_browser = df_one_fp_per_browser._to_pandas()
 
-    # Project the datafame on the wanted attributes
+    # Project the dataframe on the wanted attributes
     attribute_names = [attribute.name for attribute in attribute_set]
     projected_dataframe = df_one_fp_per_browser[attribute_names]
 
     # 1. Convert the values of the attributes as strings for the
     #    fingerprints containing NaN values to not be ignored
-    # 2. Count the occurences of each distinct fingerprint
+    # 2. Count the occurrences of each distinct fingerprint
     # 3. Name the count column as COUNT_FIELD
-    # 4. Project on the count column to obtain a Serie such that each value
+    # 4. Project on the count column to obtain a Series such that each value
     #    is the number of browsers sharing a given fingerprint
     distinct_value_count = (projected_dataframe
                             .astype('str')
@@ -95,7 +96,7 @@ class AttributeSetEntropy(Analysis):
             KeyError: An attribute is not in the fingerprint dataset.
         """
         # We will work on a dataset with only a fingerprint per browser to
-        # avoid overcounting effects
+        # avoid over-counting effects
         df_one_fp_per_browser = self._dataset.get_df_w_one_fp_per_browser()
 
         # Compute the entropy of the fingerprints given this attribute set

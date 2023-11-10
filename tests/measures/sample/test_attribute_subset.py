@@ -2,16 +2,14 @@
 """Test module of the brfast.measures.distinguishability.entropy module."""
 
 import unittest
-from math import log2
 from itertools import product
 from os import remove
 from typing import Set
 
-from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.attribute import AttributeSet
 from brfast.measures.sample.attribute_subset import AttributeSetSample
-
 from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        UNEXISTENT_ATTRIBUTE)
+                        NON_EXISTENT_ATTRIBUTE)
 
 CSV_RESULT_PATH = 'sample_analysis_csv_result.csv'
 SAMPLE_SIZE = 3
@@ -66,8 +64,8 @@ class TestAttributeSetSample(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check_sample_result(WONT_COMPUTE)
 
-    def test_unexistent_attribute(self):
-        self._attribute_set.add(UNEXISTENT_ATTRIBUTE)
+    def test_non_existent_attribute(self):
+        self._attribute_set.add(NON_EXISTENT_ATTRIBUTE)
         with self.assertRaises(KeyError):
             self.check_sample_result(WONT_COMPUTE)
 

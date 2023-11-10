@@ -10,7 +10,6 @@ from typing import Optional
 
 from loguru import logger
 
-
 OPTION_FILE_NAME = 'config.ini'
 ANALYSIS_ENGINES = ['pandas', 'modin.pandas']
 MODIN_ENGINES = ['ray', 'dask']
@@ -27,10 +26,10 @@ def check_parameter(verification: bool, error_message: Optional[str] = '',
                    incorrect.
     success_message: The message to display if everything is fine.
     """
-    if all((verification,
-            threading.current_thread() is not threading.main_thread())):
+    if verification:
         # Only display on the main thread to avoid having too many logs
-        logger.debug(success_message)
+        if threading.current_thread() is not threading.main_thread():
+            logger.debug(success_message)
     else:
         logger.error(error_message)
         sys.exit()

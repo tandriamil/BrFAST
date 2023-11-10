@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Execute the three exploration algorithms on the a given dataset.
+"""Execute the three exploration algorithms on a given dataset.
 
 This script requires:
 - The dataset preprocessed into a 'fingerprint.csv' file.
@@ -12,7 +12,7 @@ This script requires:
 import argparse
 import importlib
 from os import path
-from pathlib import PurePath
+from pathlib import Path
 
 from loguru import logger
 
@@ -42,7 +42,7 @@ USABILITY_COST_WEIGHTS = {
 def main():
     """Execute the three exploration methods on the dummy FPSelect example."""
     args = handle_arguments()
-    data_path = PurePath(args.input_data_dir[0])
+    data_path = Path(args.input_data_dir[0])
     logger.debug(f'Considering the data path {data_path}.')
 
     # Generate the fingerprint dataset
@@ -123,7 +123,7 @@ def handle_arguments() -> argparse.Namespace:
     """
     # Handle the arguments
     parser = argparse.ArgumentParser(
-        description=('Process the attribute selection on a dataset.'))
+        description='Process the attribute selection on a dataset.')
     parser.add_argument('input_data_dir', type=str, nargs=1,
                         help='The path to the directory containing the data.')
     parser.add_argument('-m', '--method', metavar='selection_method',

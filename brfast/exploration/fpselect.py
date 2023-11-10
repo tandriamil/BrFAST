@@ -6,7 +6,7 @@ from math import ceil
 from multiprocessing import Pool
 from multiprocessing.managers import ListProxy
 from os import cpu_count
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, Set, Tuple
 
 from loguru import logger
 
@@ -31,7 +31,7 @@ class FPSelect(Exploration):
             sensitivity_measure: The sensitivity measure.
             usability_cost_measure: The usability cost.
             dataset: The fingerprint dataset.
-            sensitivity_threshold: The sensivity threshold.
+            sensitivity_threshold: The sensitivity threshold.
             explored_paths: The number of paths explored by FPSelect.
             pruning: Use the pruning methods.
         """
@@ -59,7 +59,7 @@ class FPSelect(Exploration):
 
         # The set S of the attributes set to expand at each step, initialized
         # to k empty sets
-        self._attribute_sets_to_expand = set({AttributeSet()})
+        self._attribute_sets_to_expand = {AttributeSet()}
 
         # The set I of the attribute sets which supersets are to ignore
         self._attribute_sets_ignored_supersets = set()
@@ -130,11 +130,11 @@ class FPSelect(Exploration):
             self._attribute_sets_to_expand.clear()
 
             # After having explored all the attribute sets, get the k most
-            # efficient attr. sets that are the next to explore
-            for best_atset in sorted(next_attr_sets_to_expand,
-                                     key=next_attr_sets_to_expand.get,
-                                     reverse=True)[:self._explored_paths]:
-                self._attribute_sets_to_expand.add(best_atset)
+            # efficient attribute sets that are the next to explore
+            for best_set in sorted(next_attr_sets_to_expand,
+                                   key=next_attr_sets_to_expand.get,
+                                   reverse=True)[:self._explored_paths]:
+                self._attribute_sets_to_expand.add(best_set)
 
             # Next stage
             stage += 1
@@ -158,11 +158,11 @@ class FPSelect(Exploration):
         def update_after_exploration(result: Tuple[Dict[AttributeSet, float],
                                                    Set[AttributeSet],
                                                    Set[AttributeSet]]):
-            """Update the informations after exploring a level.
+            """Update the information after exploring a level.
 
             Args:
                 result: A triplet with
-                    - The attribute sets that could be explored afterwards and
+                    - The attribute sets that could be explored afterward and
                        their efficiency.
                     - The attribute sets that satisfy the threshold.
                     - The attribute sets which supersets are to be ignored.
@@ -170,10 +170,10 @@ class FPSelect(Exploration):
             Note: This is executed by the main thread and does not pose any
                   concurrency or synchronization problem.
             """
-            attr_sets_eff, satisf_attr_sets, attr_sets_ign_sups = result
+            attr_sets_eff, satisfying_attr_sets, attr_sets_ign_sups = result
             attribute_sets_efficiency.update(attr_sets_eff)
             self._attribute_sets_ignored_supersets.update(attr_sets_ign_sups)
-            self._satisfying_attribute_sets.extend(satisf_attr_sets)
+            self._satisfying_attribute_sets.extend(satisfying_attr_sets)
 
         # If we execute on a single process
         if not params.getboolean('Multiprocessing', 'explorations'):
@@ -230,13 +230,13 @@ class FPSelect(Exploration):
 
         For each S_i of S, we generate the attribute sets to explore that are
         composed of each S_i with one more attribute that is not in S_i.
-        E <-- {C = S_i Union {a} :
-               For all S_i in S, For all a in A, a Not in S_i}
+        E <-- {C = S_i Union {_a} :
+               For all S_i in S, For all _a in A, _a Not in S_i}
 
         We do not hold C in E if:
-        - It is a superset of an attr. set of T (i.e., if it is a superset of
-          an attr. set that satisfies the sensitivity threshold).
-        - The pruning methods are used and C is a superset of the attr. sets
+        - It is a superset of an attribute set of T (i.e., if it is a superset
+          of an attribute set that satisfies the sensitivity threshold).
+        - The pruning methods are used and C is a superset of the attribute sets
           whose supersets are to be ignored.
 
         Returns:
@@ -306,7 +306,7 @@ class FPSelect(Exploration):
         return next_attr_sets_to_explore
 
 
-def _explore_attribute_sets(attribute_sets_to_explore: List[AttributeSet],
+def _explore_attribute_sets(attribute_sets_to_explore: Set[AttributeSet],
                             sensitivity_measure: SensitivityMeasure,
                             usability_cost_measure: UsabilityCostMeasure,
                             sensitivity_threshold: float, max_cost: float,
@@ -334,7 +334,7 @@ def _explore_attribute_sets(attribute_sets_to_explore: List[AttributeSet],
 
     Returns:
         A triplet with
-        - The attribute sets that could be explored afterwards and their
+        - The attribute sets that could be explored afterward and their
           efficiency.
         - The attribute sets that satisfy the sensitivity threshold.
         - The attribute sets which supersets are to be ignored.
@@ -352,7 +352,7 @@ def _explore_attribute_sets(attribute_sets_to_explore: List[AttributeSet],
         cost, cost_explanation = usability_cost_measure.evaluate(attribute_set)
         logger.debug(f'  sensitivity={sensitivity} / usability cost={cost}')
 
-        # Get the current minimum cost. Note that it can be updated afterwards,
+        # Get the current minimum cost. Note that it can be updated afterward,
         # but it does not change the overall result. The only effect is that
         # few additional attribute sets can be put in the
         # process_attribute_sets_efficiency storage.
@@ -409,7 +409,7 @@ def _explore_attribute_sets(attribute_sets_to_explore: List[AttributeSet],
             process_attribute_sets_ignored_supersets)
 
 
-def _expand_attribute_sets(attr_sets_to_expand: List[AttributeSet],
+def _expand_attribute_sets(attr_sets_to_expand: Set[AttributeSet],
                            candidate_attributes: AttributeSet,
                            satisfying_attribute_sets: Set[AttributeSet],
                            attribute_sets_ignored_supersets: Set[AttributeSet],
@@ -430,39 +430,40 @@ def _expand_attribute_sets(attr_sets_to_expand: List[AttributeSet],
     """
     next_attr_sets_to_explore = set()
 
-    # Generate the attr. sets composed of S_i with one more attr.
+    # Generate the attribute sets composed of S_i with one more attribute
     # For all S_i in S
     for set_to_expand in attr_sets_to_expand:
-        # For all a in A diff C
+        # For all _a in A diff C
         for attribute in candidate_attributes:
             if attribute in set_to_expand:
                 continue
 
-            # The attr. set C with one more attribute (S_i union {a})
+            # The attribute set C with one more attribute (S_i union {_a})
             new_attr_set = AttributeSet(set_to_expand)
             new_attr_set.add(attribute)
             add_new_attr_set = True
 
-            # Ignore C if the attr. a is already in the attr. set S_i
+            # Ignore C if the attribute _a is already in the attribute set S_i
             if attribute in set_to_expand:
-                add_new_attr_set = False
+                # add_new_attr_set should be set to False here, but as we
+                # continue it is set again to True
                 continue
 
-            # Ignore C if it is a superset of an attr. set of T
+            # Ignore C if it is a superset of an attribute set of T
             for attr_set_sat in satisfying_attribute_sets:
                 if new_attr_set.issuperset(attr_set_sat):
                     add_new_attr_set = False
                     break
 
-            # Ignore C if we use the pruning methods and it is a superset
-            # of an attr. set which supersets are to be ignored
+            # Ignore C if we use the pruning methods, and it is a superset
+            # of an attribute set which supersets are to be ignored
             if use_pruning_methods and add_new_attr_set:
                 for attr_set_to_ign in attribute_sets_ignored_supersets:
                     if new_attr_set.issuperset(attr_set_to_ign):
                         add_new_attr_set = False
                         break
 
-            # If C is fine, it is added to the attr. sets to explore
+            # If C is fine, it is added to the attribute sets to explore
             if add_new_attr_set:
                 next_attr_sets_to_explore.add(new_attr_set)
 

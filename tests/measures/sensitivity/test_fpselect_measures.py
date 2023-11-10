@@ -1,22 +1,17 @@
 #!/usr/bin/python3
 """Test module of the brfast.measures.sensitivity.fpselect module."""
 
-import importlib
 import unittest
 
 import pandas as pd
 from pandas.testing import assert_frame_equal  # To test DataFrame objects
 
-from brfast.data.attribute import AttributeSet
-from brfast.data.dataset import MetadataField
-from brfast.measures.sensitivity.fpselect import (
-    _get_top_k_fingerprints, TopKFingerprints, PROPORTION_FIELD)
-
-from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        DummyFingerprintDataset)
-
 # Import the engine of the analysis module (pandas or modin)
 from brfast.config import params
+from brfast.data.attribute import AttributeSet
+from brfast.measures.sensitivity.fpselect import (
+    _get_top_k_fingerprints, TopKFingerprints, PROPORTION_FIELD)
+from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyFingerprintDataset)
 
 
 class TestGetTopKFingerprintsFunction(unittest.TestCase):

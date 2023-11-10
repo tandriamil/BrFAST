@@ -10,12 +10,13 @@ from typing import Dict
 
 from loguru import logger
 
-from brfast.exploration import Exploration, State, TraceData
 from brfast.config import params
 from brfast.data.attribute import Attribute, AttributeSet
 from brfast.data.dataset import FingerprintDataset
+from brfast.exploration import Exploration, State, TraceData
 from brfast.measures.distinguishability.entropy import attribute_set_entropy
 from brfast.utils.sequences import sort_dict_by_value
+
 pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 
@@ -48,7 +49,7 @@ class Entropy(Exploration):
         """
         # Get a dictionary of the entropy of each attribute
         logger.info('Computing the entropy of each attribute...')
-        attributes_entropy = _get_attributes_entropy(
+        attributes_entropy = get_attributes_entropy(
             self._dataset, self._dataset.candidate_attributes)
         entropy_compute_time = datetime.now() - self._start_time
         logger.info('Entropy of the attributes computed after '
@@ -101,9 +102,9 @@ class Entropy(Exploration):
             })
 
 
-def _get_attributes_entropy(dataset: FingerprintDataset,
-                            attributes: AttributeSet
-                            ) -> Dict[Attribute, float]:
+def get_attributes_entropy(dataset: FingerprintDataset,
+                           attributes: AttributeSet
+                           ) -> Dict[Attribute, float]:
     """Give a dictionary with the entropy of each attribute.
 
     Args:
@@ -125,13 +126,13 @@ def _get_attributes_entropy(dataset: FingerprintDataset,
             raise KeyError(f'The attribute {attribute} is not in the dataset.')
 
     # We will work on a dataset with only a fingerprint per browser to avoid
-    # overcounting effects
+    # over-counting effects
     df_one_fp_per_browser = dataset.get_df_w_one_fp_per_browser()
 
     # If we execute on a single process
     if not params.getboolean('Multiprocessing', 'explorations'):
         logger.debug('Measuring the attributes entropy on a single process...')
-        return _compute_attribute_entropy(df_one_fp_per_browser, attributes)
+        return compute_attribute_entropy(df_one_fp_per_browser, attributes)
 
     # The dictionary to update when using multiprocessing
     logger.debug('Measuring the attributes entropy using multiprocessing...')
@@ -149,14 +150,14 @@ def _get_attributes_entropy(dataset: FingerprintDataset,
         """Update the complete dictionary attributes_entropy.
 
         Args:
-            attrs_size: The dictionary containing the subset of the results
-                        computed by a process.
+            attrs_entropy: The dictionary containing the subset of the results
+                           computed by a process.
 
         Note: This is executed by the main thread and does not pose any
               concurrency or synchronization problem.
         """
-        for attribute, attribute_entropy in attrs_entropy.items():
-            attributes_entropy[attribute] = attribute_entropy
+        for _attribute, _attribute_entropy in attrs_entropy.items():
+            attributes_entropy[_attribute] = _attribute_entropy
 
     # Spawn a number of processes equal to the number of cores
     attributes_list = list(attributes)
@@ -169,7 +170,7 @@ def _get_attributes_entropy(dataset: FingerprintDataset,
             attributes_subset = AttributeSet(attributes_list[start_id:end_id])
 
             async_result = pool.apply_async(
-                _compute_attribute_entropy,
+                compute_attribute_entropy,
                 args=(df_one_fp_per_browser, attributes_subset),
                 callback=update_attributes_entropy)
             async_results.append(async_result)
@@ -182,9 +183,9 @@ def _get_attributes_entropy(dataset: FingerprintDataset,
     return attributes_entropy
 
 
-def _compute_attribute_entropy(df_one_fp_per_browser: pd.DataFrame,
-                               attributes_subset: AttributeSet
-                               ) -> Dict[Attribute, float]:
+def compute_attribute_entropy(df_one_fp_per_browser: pd.DataFrame,
+                              attributes_subset: AttributeSet
+                              ) -> Dict[Attribute, float]:
     """Compute the entropy of each attribute (passed to each process).
 
     Args:

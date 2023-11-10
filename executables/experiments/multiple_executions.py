@@ -11,7 +11,7 @@ This script requires:
 
 import importlib
 from os import path
-from pathlib import PurePath
+from pathlib import PurePath, Path
 from typing import Dict
 
 from loguru import logger
@@ -58,7 +58,7 @@ FPSELECT_USE_PRUNING_METHODS = True
 def main():
     """Execute the three exploration methods on the dummy FPSelect example."""
     for data_directory in DATA_DIRECTORIES:
-        data_path = PurePath(data_directory)
+        data_path = Path(data_directory)
         logger.debug(f'Considering the data path {data_path}.')
 
         # Generate the fingerprint dataset

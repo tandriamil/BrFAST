@@ -33,7 +33,7 @@ def main():
     sql_script_path = args.sql_script_path[0]
     output_directory = args.output_directory[0]
 
-    # Use a in-memory database to store this database
+    # Use an in-memory database to store this database
     logger.info('Initializing the sqlite3 in-memory database.')
     sql_connection = sqlite3.connect(':memory:')
 
@@ -106,7 +106,7 @@ def replace_binary_columns_by_their_hash(sql_connection: sqlite3.Connection):
     badly handled in csv format.
 
     This function replace the long text columns by the hash representation as a
-    hexadecimal string of their binary value, which is easir to handle.
+    hexadecimal string of their binary value, which is easier to handle.
 
     Args:
         sql_connection: The SQL connection to the in-memory database.
@@ -187,7 +187,7 @@ def get_column_names(sql_connection: sqlite3.Connection) -> List[str]:
     cursor = sql_connection.cursor()
 
     # Get the name of the columns of the database
-    get_columns_query = (f'PRAGMA table_info({DB_NAME});')
+    get_columns_query = f'PRAGMA table_info({DB_NAME});'
     logger.debug(f'Executing "{get_columns_query}"...')
     get_columns_result = cursor.execute(get_columns_query)
 

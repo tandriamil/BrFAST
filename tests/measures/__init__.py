@@ -28,7 +28,7 @@ TOTAL_COST_FIELD = 'total_cost'
 
 
 class DummySensitivity(SensitivityMeasure):
-    """A dummy sensivity measure that takes the example of our paper."""
+    """A dummy sensitivity measure that takes the example of our paper."""
 
     def evaluate(self, attribute_set: AttributeSet) -> float:
         return SENSITIVITIES[frozenset(attribute_set.attribute_ids)]

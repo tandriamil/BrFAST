@@ -2,14 +2,17 @@
 """brfast.data.dataset module: Classes related to the fingerprint datasets."""
 
 import importlib
-from io import TextIOWrapper
 from os import path
+from pathlib import Path
+from typing import TextIO
 
 from loguru import logger
+from werkzeug.datastructures import FileStorage
 
 # Import the engine of the analysis module (pandas or modin)
 from brfast.config import params
 from brfast.data.attribute import Attribute, AttributeSet
+
 pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 
@@ -22,8 +25,8 @@ class MetadataField:
     ALL = {BROWSER_ID, TIME_OF_COLLECT}
 
 
-class MissingMetadatasFields(Exception):
-    """The required metadatas columns are missing from the dataset."""
+class MissingMetadataFields(Exception):
+    """The required metadata columns are missing from the dataset."""
 
 
 # ==================== Fingerprint dataset related classes ====================
@@ -40,13 +43,13 @@ class FingerprintDataset:
         # Process the dataset
         self._process_dataset()
 
-        # Check that the necessary metadatas are present
-        required_metadatas = MetadataField.ALL
-        if not (isinstance(self._dataframe.index, pd.MultiIndex)
-                and required_metadatas.issubset(self._dataframe.index.names)):
-            raise MissingMetadatasFields(
+        # Check that the necessary metadata are present
+        required_metadata = MetadataField.ALL
+        if not (isinstance(self._dataframe.index, pd.MultiIndex)               # noqa
+                and required_metadata.issubset(self._dataframe.index.names)):  # noqa
+            raise MissingMetadataFields(
                 'The required metadata fields and indices '
-                f'{required_metadatas} are missing from the dataset.')
+                f'{required_metadata} are missing from the dataset.')
 
         # Set the candidate attributes
         self._set_candidate_attributes()
@@ -203,14 +206,14 @@ class FingerprintDataset:
 class FingerprintDatasetFromFile(FingerprintDataset):
     """A fingerprint dataset read from a file."""
 
-    def __init__(self, dataset_path: str):
+    def __init__(self, dataset_path: Path):
         """Initialize the FingerprintDataset with the path to the dataset.
 
         Args:
             dataset_path: The path to the fingerprint dataset.
 
         Raises:
-            FileNotFoundError: There is not file at the given dataset path.
+            FileNotFoundError: There is no file at the given dataset path.
         """
         if not path.isfile(dataset_path):
             raise FileNotFoundError(f'The dataset file at {dataset_path} is '
@@ -254,7 +257,7 @@ class FingerprintDatasetFromFile(FingerprintDataset):
             self._candidate_attributes.add(attribute)
 
     @property
-    def dataset_path(self) -> str:
+    def dataset_path(self) -> Path:
         """Give the path to the fingerprint dataset.
 
         Returns:
@@ -285,10 +288,10 @@ class FingerprintDatasetFromCSVFile(FingerprintDatasetFromFile):
         #   infer_datetime_format activated for performances
         self._dataframe = pd.read_csv(self._dataset_path, index_col=False)
 
-        # Check that the necessary metadatas are present
+        # Check that the necessary metadata are present
         for required_metadata in MetadataField.ALL:
             if required_metadata not in self._dataframe:
-                raise MissingMetadatasFields(
+                raise MissingMetadataFields(
                     f'The required metadata field {required_metadata} is '
                     'missing from the dataset.')
 
@@ -303,9 +306,9 @@ class FingerprintDatasetFromCSVFile(FingerprintDatasetFromFile):
 
 
 class FingerprintDatasetFromCSVInMemory(FingerprintDataset):
-    """A fingerprint dataset read from a in memory csv file."""
+    """A fingerprint dataset read from an in memory csv file."""
 
-    def __init__(self, file_handle: TextIOWrapper):
+    def __init__(self, file_handle: FileStorage | TextIO):
         """Initialize with the file handle of the in memory csv file.
 
         Args:
@@ -333,10 +336,10 @@ class FingerprintDatasetFromCSVInMemory(FingerprintDataset):
         #   infer_datetime_format activated for performances
         self._dataframe = pd.read_csv(self._file_handle, index_col=False)
 
-        # Check that the necessary metadatas are present
+        # Check that the necessary metadata are present
         for required_metadata in MetadataField.ALL:
             if required_metadata not in self._dataframe:
-                raise MissingMetadatasFields(
+                raise MissingMetadataFields(
                     f'The required metadata field {required_metadata} is '
                     'missing from the dataset.')
 

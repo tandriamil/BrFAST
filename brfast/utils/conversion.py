@@ -9,7 +9,7 @@ def is_str_float(str_value: str) -> bool:
         str_value: The string value to check.
 
     Returns:
-        Whether the string value can be casted to a float or not.
+        Whether the string value can be cast to a float or not.
     """
     try:
         float(str_value)

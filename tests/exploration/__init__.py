@@ -1,13 +1,10 @@
 #!/usr/bin/python3
-"""Init file of the tests.exploration module."""
+"""Init file."""
 
 from typing import Any, Dict
 
 from brfast.data.attribute import AttributeSet
-from brfast.exploration import (
-    Exploration, ExplorationNotRun, ExplorationParameters,
-    SensitivityThresholdUnreachable, State, TraceData)
-
+from brfast.exploration import Exploration, State, TraceData
 from tests.data import ATTRIBUTES
 from tests.measures import SENSITIVITIES, TOTAL_COST_FIELD, USABILITIES
 
@@ -97,7 +94,7 @@ class DummyExploration(Exploration):
 
         # Update the list of the explored attributes. We ignore the first
         # attribute set composed of all the attributes which is automatically
-        # added when checking that the sensitivity threshold is reachable)
+        # added when checking that the sensitivity threshold is reachable
         for explored_attribute_set in self.EXPLORED_ATTRIBUTE_SETS[1:]:
             self._add_explored_attribute_set(explored_attribute_set)
 

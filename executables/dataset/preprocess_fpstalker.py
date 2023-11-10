@@ -40,7 +40,7 @@ def main():
         logger.info('We ignore the base64 encoded canvases in the csv output.')
         ignored_columns = IGNORED_COLUMNS + RAW_CANVAS_COLUMNS
 
-    # Use a in-memory database to store this database
+    # Use an in-memory database to store this database
     logger.info('Initializing the sqlite3 in-memory database.')
     sql_connection = sqlite3.connect(':memory:')
 
@@ -101,8 +101,8 @@ def export_database_to_csv(sql_connection: sqlite3.Connection,
         # For each row of the database
         for row in fetch_all_result:
             # Export the list of webGL extensions
-            webgl_extensions = '§'.join(row[-1].split('§')[1:])
-            row = row[:-1] + (webgl_extensions,)
+            web_gl_extensions = '§'.join(row[-1].split('§')[1:])
+            row = row[:-1] + (web_gl_extensions,)
             fp_csv_writer.writerow(row)
 
     fetch_all_cursor.close()
@@ -205,7 +205,7 @@ def get_column_names(sql_connection: sqlite3.Connection,
         The column names to hold (i.e., these of the attributes).
     """
     # Get the name of the columns of the database
-    get_columns_query = (f'PRAGMA table_info({DB_NAME});')
+    get_columns_query = f'PRAGMA table_info({DB_NAME});'
     logger.debug(f'Executing "{get_columns_query}"...')
     get_columns_cursor = sql_connection.cursor()
     get_columns_result = get_columns_cursor.execute(get_columns_query)
@@ -220,7 +220,7 @@ def get_column_names(sql_connection: sqlite3.Connection,
     return column_names
 
 
-def clean_line(line: str) -> bool:
+def clean_line(line: str) -> str:
     """Check whether a line of the SQL script should be executed or not.
 
     Args:

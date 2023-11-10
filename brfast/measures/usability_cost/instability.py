@@ -35,7 +35,7 @@ class ProportionOfChanges(Analysis):
             dataframe = dataframe._to_pandas()
 
         # 1. Group by the browser id (no sort for performances, no group key to
-        #    not add an additonal column with the group key)
+        #    not add a column with the group key)
         # 2. Sort by the time of collection for each group (give a DataFrame)
         # 3. Regroup by the browser id, here each group has the fingerprints
         #    sorted by the time of collection
@@ -132,7 +132,7 @@ def _compute_attributes_instability(grouped_by_browser: DataFrameGroupBy,
     Args:
         grouped_by_browser: The group by dataframe containing the fingerprints
                             of each browser.
-        attributes_subset: The attributes for which to compute the instability.
+        attributes: The attributes for which to compute the instability.
 
     Raises:
         KeyError: There are fingerprints and one of the attribute is not in the

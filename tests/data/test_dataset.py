@@ -4,17 +4,18 @@
 import importlib
 import unittest
 from os import path
-from pathlib import PurePath
+from pathlib import PurePath, Path
 from typing import List
 
 from pandas.testing import assert_frame_equal  # To test DataFrame objects
 
+# Import the engine of the analysis module (pandas or modin)
+from brfast.config import params
 from brfast.data.attribute import AttributeSet
 from brfast.data.dataset import (
     FingerprintDataset, FingerprintDatasetFromFile,
     FingerprintDatasetFromCSVFile, FingerprintDatasetFromCSVInMemory,
-    MetadataField, MissingMetadatasFields)
-
+    MetadataField, MissingMetadataFields)
 from tests.data import (
     ATTRIBUTES, data_subset,
     # FingerprintDataset dummy implementations
@@ -27,12 +28,10 @@ from tests.data import (
     DummyFPEmptyDatasetFromFile,
     DummyFPDatasetFromFileMissingProcessDataset)
 
-# Import the engine of the analysis module (pandas or modin)
-from brfast.config import params
 pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 RELATIVE_PATH_TO_DATASETS = 'assets/fingerprint-datasets'
-UNEXISTENT_PATH = '/this/path/does/not/exist'
+NON_EXISTENT_PATH = Path('/this/path/does/not/exist')
 DATASET_PATHS = {
     'empty': 'fingerprint-sample-empty.csv',
     'sample': 'fingerprint-sample.csv',
@@ -44,7 +43,7 @@ DATASET_DATA = {
     'empty': {MetadataField.BROWSER_ID: [], MetadataField.TIME_OF_COLLECT: []},
     'sample': {
         MetadataField.BROWSER_ID: [1, 2, 3, 2, 3],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-04-29 17:00:00'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-04-29 17:00:00',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -53,7 +52,7 @@ DATASET_DATA = {
     },
     'clean': {
         MetadataField.BROWSER_ID: [1, 2, 3, 4, 5],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-04-29 17:00:00'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-04-29 17:00:00',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -72,25 +71,23 @@ class TestFingerprintDataset(unittest.TestCase):
 
     def test_interface_error(self):
         with self.assertRaises(NotImplementedError):
-            fp_dataset_interface = FingerprintDataset()
+            FingerprintDataset()
 
     def test_missing_process_dataset(self):
         with self.assertRaises(NotImplementedError):
-            fp_dataset_missing_process_dataset = (
-                DummyFingerprintDatasetMissingProcessDataset())
+            DummyFingerprintDatasetMissingProcessDataset()
 
     def test_missing_set_candidate_attributes(self):
         with self.assertRaises(NotImplementedError):
-            fp_dataset_missing_set_candidate_attributes = (
-                DummyFingerprintDatasetMissingSetCandidateAttributes())
+            DummyFingerprintDatasetMissingSetCandidateAttributes()
 
     def test_missing_browser_id_field(self):
-        with self.assertRaises(MissingMetadatasFields):
-            fp_dataset_missing_browser_id = DummyDatasetMissingBrowserId()
+        with self.assertRaises(MissingMetadataFields):
+            DummyDatasetMissingBrowserId()
 
     def test_missing_time_of_collect(self):
-        with self.assertRaises(MissingMetadatasFields):
-            fp_dataset_missing_toc = DummyDatasetMissingTimeOfCollect()
+        with self.assertRaises(MissingMetadataFields):
+            DummyDatasetMissingTimeOfCollect()
 
     def test_repr(self):
         self.assertIsInstance(repr(self._dummy_fp_dataset), str)
@@ -118,7 +115,7 @@ class TestFingerprintDataset(unittest.TestCase):
         assert_frame_equal(dataset.dataframe, comparison_dataframe,
                            check_frame_type=False)  # As modin can be used
         with self.assertRaises(AttributeError):
-            dataset.dataframe = pd.DataFrame()
+            dataset.dataframe = pd.DataFrame()  # noqa
 
     def test_dataframe_property(self):
         self.check_dataframe_property(self._dummy_fp_dataset,
@@ -132,7 +129,7 @@ class TestFingerprintDataset(unittest.TestCase):
                                             attribute_set: AttributeSet):
         self.assertEqual(dataset.candidate_attributes, attribute_set)
         with self.assertRaises(AttributeError):
-            self._empty_dataset.candidate_attributes = AttributeSet()
+            self._empty_dataset.candidate_attributes = AttributeSet()  # noqa
 
     def test_candidate_attributes_property(self):
         self.check_candidate_attributes_property(self._dummy_fp_dataset,
@@ -159,11 +156,11 @@ class TestFingerprintDataset(unittest.TestCase):
             [MetadataField.BROWSER_ID, MetadataField.TIME_OF_COLLECT],
             inplace=True)
 
-        df_w_1_fp_p_bswr = dataset.get_df_w_one_fp_per_browser(
+        df_w_1_fp_p_browser = dataset.get_df_w_one_fp_per_browser(
             last_fingerprint=last_fingerprint)
-        self.assertIsInstance(df_w_1_fp_p_bswr, pd.DataFrame)
-        self.assertEqual(len(df_w_1_fp_p_bswr), len(expected_dataframe))
-        assert_frame_equal(df_w_1_fp_p_bswr, expected_dataframe,
+        self.assertIsInstance(df_w_1_fp_p_browser, pd.DataFrame)
+        self.assertEqual(len(df_w_1_fp_p_browser), len(expected_dataframe))
+        assert_frame_equal(df_w_1_fp_p_browser, expected_dataframe,
                            check_frame_type=False)  # As modin can be used
         # Just to check that the caching works fine we call this two times
         assert_frame_equal(dataset.get_df_w_one_fp_per_browser(
@@ -198,7 +195,7 @@ class TestFingerprintDataset(unittest.TestCase):
 class TestFingerprintDatasetFromFile(TestFingerprintDataset):
 
     def setUp(self):
-        tests_module_path = PurePath(path.abspath(__file__)).parents[1]
+        tests_module_path = Path(path.abspath(__file__)).parents[1]
         fingerprint_dataset_path = tests_module_path.joinpath(
             RELATIVE_PATH_TO_DATASETS)
 
@@ -211,20 +208,18 @@ class TestFingerprintDatasetFromFile(TestFingerprintDataset):
 
     def test_interface_error(self):
         with self.assertRaises(NotImplementedError):
-            fp_dataset_interface = FingerprintDatasetFromFile(
-                self._sample_path)
+            FingerprintDatasetFromFile(self._sample_path)
 
     def test_missing_process_dataset(self):
         with self.assertRaises(NotImplementedError):
-            fp_dataset_missing_process_dataset = (
-                DummyFPDatasetFromFileMissingProcessDataset(self._sample_path))
+            DummyFPDatasetFromFileMissingProcessDataset(self._sample_path)
 
     def test_missing_set_candidate_attributes(self):
         pass  # This function is defined in this interface
 
-    def test_unexistent_path(self):
+    def test_non_existent_path(self):
         with self.assertRaises(FileNotFoundError):
-            erroneous_dataset = FingerprintDatasetFromFile(UNEXISTENT_PATH)
+            FingerprintDatasetFromFile(NON_EXISTENT_PATH)
 
     def test_dataset_path_property(self):
         self.assertEqual(self._dummy_fp_dataset.dataset_path,
@@ -232,11 +227,11 @@ class TestFingerprintDatasetFromFile(TestFingerprintDataset):
         self.assertEqual(self._empty_dataset.dataset_path, self._sample_path)
         self.assertEqual(self._clean_dataset.dataset_path, self._sample_path)
         with self.assertRaises(AttributeError):
-            self._dummy_fp_dataset.dataset_path = UNEXISTENT_PATH
+            self._dummy_fp_dataset.dataset_path = NON_EXISTENT_PATH  # noqa
         with self.assertRaises(AttributeError):
-            self._empty_dataset.dataset_path = UNEXISTENT_PATH
+            self._empty_dataset.dataset_path = NON_EXISTENT_PATH     # noqa
         with self.assertRaises(AttributeError):
-            self._clean_dataset.dataset_path = UNEXISTENT_PATH
+            self._clean_dataset.dataset_path = NON_EXISTENT_PATH     # noqa
 
     # The other tests are taken directly from TestFingerprintDataset
 
@@ -244,7 +239,7 @@ class TestFingerprintDatasetFromFile(TestFingerprintDataset):
 class TestFingerprintDatasetFromCSVFile(TestFingerprintDatasetFromFile):
 
     def setUp(self):
-        tests_module_path = PurePath(path.abspath(__file__)).parents[1]
+        tests_module_path = Path(path.abspath(__file__)).parents[1]
         fingerprint_dataset_path = tests_module_path.joinpath(
             RELATIVE_PATH_TO_DATASETS)
 
@@ -273,18 +268,16 @@ class TestFingerprintDatasetFromCSVFile(TestFingerprintDatasetFromFile):
         pass  # This function is defined in this interface
 
     def test_missing_browser_id_field(self):
-        with self.assertRaises(MissingMetadatasFields):
-            fp_dataset_missing_browser_id = FingerprintDatasetFromCSVFile(
-                self._missing_browser_id_path)
+        with self.assertRaises(MissingMetadataFields):
+            FingerprintDatasetFromCSVFile(self._missing_browser_id_path)
 
     def test_missing_time_of_collect(self):
-        with self.assertRaises(MissingMetadatasFields):
-            fp_dataset_missing_toc = FingerprintDatasetFromCSVFile(
-                self._missing_time_of_collect_path)
+        with self.assertRaises(MissingMetadataFields):
+            FingerprintDatasetFromCSVFile(self._missing_time_of_collect_path)
 
-    def test_unexistent_path(self):
+    def test_non_existent_path(self):
         with self.assertRaises(FileNotFoundError):
-            erroneous_dataset = FingerprintDatasetFromCSVFile(UNEXISTENT_PATH)
+            FingerprintDatasetFromCSVFile(NON_EXISTENT_PATH)
 
     def test_dataset_path_property(self):
         self.assertEqual(self._dummy_fp_dataset.dataset_path,
@@ -292,11 +285,11 @@ class TestFingerprintDatasetFromCSVFile(TestFingerprintDatasetFromFile):
         self.assertEqual(self._empty_dataset.dataset_path, self._empty_path)
         self.assertEqual(self._clean_dataset.dataset_path, self._clean_path)
         with self.assertRaises(AttributeError):
-            self._dummy_fp_dataset.dataset_path = UNEXISTENT_PATH
+            self._dummy_fp_dataset.dataset_path = NON_EXISTENT_PATH  # noqa
         with self.assertRaises(AttributeError):
-            self._empty_dataset.dataset_path = UNEXISTENT_PATH
+            self._empty_dataset.dataset_path = NON_EXISTENT_PATH     # noqa
         with self.assertRaises(AttributeError):
-            self._clean_dataset.dataset_path = UNEXISTENT_PATH
+            self._clean_dataset.dataset_path = NON_EXISTENT_PATH     # noqa
 
     def test_dataframe_property(self):
         self.check_dataframe_property(self._dummy_fp_dataset,
@@ -379,13 +372,12 @@ class TestFingerprintDatasetFromCSVInMemory(TestFingerprintDataset):
         pass  # This function is defined in this interface
 
     def test_missing_browser_id_field(self):
-        with self.assertRaises(MissingMetadatasFields):
-            fp_dataset_missing_browser_id = FingerprintDatasetFromCSVInMemory(
-                self._missing_browser_id_file)
+        with self.assertRaises(MissingMetadataFields):
+            FingerprintDatasetFromCSVInMemory(self._missing_browser_id_file)
 
     def test_missing_time_of_collect(self):
-        with self.assertRaises(MissingMetadatasFields):
-            fp_dataset_missing_toc = FingerprintDatasetFromCSVInMemory(
+        with self.assertRaises(MissingMetadataFields):
+            FingerprintDatasetFromCSVInMemory(
                 self._missing_time_of_collect_file)
 
     def test_dataframe_property(self):

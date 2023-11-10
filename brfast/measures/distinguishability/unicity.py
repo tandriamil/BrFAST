@@ -11,7 +11,7 @@ from brfast.measures import Analysis
 
 COUNT_FIELD = '__count_field__'
 
-# The three informations that are stored in the unicity results
+# The three information that are stored in the unicity results
 UNIQUE_FPS_RESULT = 'unique_fingerprints'
 UNICITY_RATE_RESULT = 'unicity_rate'
 TOTAL_BROWSERS_RESULT = 'total_browsers'
@@ -38,7 +38,7 @@ class AttributeSetUnicity(Analysis):
             KeyError: An attribute is not in the fingerprint dataset.
 
         Note:
-            For now, pandas does not include a dropna parameter in the
+            For now, pandas does not include a drop na parameter in the
             DataFrame.value_counts() function, hence it always drops the NaN
             values that can be present in our fingerprint dataset. This results
             in these fingerprints being ignored when counting the unique
@@ -51,28 +51,28 @@ class AttributeSetUnicity(Analysis):
                              'dataset or an empty attribute set.')
 
         # We will work on a dataset with only a fingerprint per browser to
-        # avoid overcounting effects
+        # avoid over-counting effects
         df_one_fp_per_browser = self._dataset.get_df_w_one_fp_per_browser()
 
-        # Project the datafame on the wanted attributes
+        # Project the dataframe on the wanted attributes
         attribute_names = self._attributes.attribute_names
         projected_dataframe = df_one_fp_per_browser[attribute_names]
 
         # 1. Convert the values of the attributes as strings for the
         #    fingerprints containing NaN values to not be ignored
-        # 2. Count the occurences of each distinct fingerprint
+        # 2. Count the occurrences of each distinct fingerprint
         # 3. Name the count column as COUNT_FIELD
-        # 4. Project on the count column to obtain a Serie such that each value
+        # 4. Project on the count column to obtain a Series such that each value
         #    is the number of browsers sharing a given fingerprint
-        fingerprint_occurences = (projected_dataframe
-                                  .astype('str')
-                                  .value_counts(sort=False)
-                                  .reset_index(name=COUNT_FIELD)
-                                  [COUNT_FIELD])
+        fingerprint_occurrences = (projected_dataframe
+                                   .astype('str')
+                                   .value_counts(sort=False)
+                                   .reset_index(name=COUNT_FIELD)
+                                   [COUNT_FIELD])
 
         # Compute the number of unique fingerprints
-        unique_fingerprints = (fingerprint_occurences
-                               [fingerprint_occurences == 1]
+        unique_fingerprints = (fingerprint_occurrences
+                               [fingerprint_occurrences == 1]
                                .sum())
 
         # Count the total number of browsers

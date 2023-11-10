@@ -4,18 +4,16 @@
 import importlib
 import unittest
 from os import path, remove
-from statistics import mean
 
+# Import the engine of the analysis module (pandas or modin)
+from brfast.config import params
 from brfast.data.attribute import AttributeSet
 from brfast.data.dataset import FingerprintDataset, MetadataField
 from brfast.measures.usability_cost.instability import (
     _compute_attributes_instability, ProportionOfChanges)
-
 from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        DummyFingerprintDataset, UNEXISTENT_ATTRIBUTE)
+                        DummyFingerprintDataset, NON_EXISTENT_ATTRIBUTE)
 
-# Import the engine of the analysis module (pandas or modin)
-from brfast.config import params
 pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 CSV_RESULT_PATH = 'test_instability.csv'
@@ -29,7 +27,7 @@ class TestComputeAttributesInstability(unittest.TestCase):
 
     def _get_grouped_by_browser(self):
         # 1. Group by the browser id (no sort for performances, no group key to
-        #    not add an additonal column with the group key)
+        #    not add a column with the group key)
         # 2. Sort by the time of collection for each group (give a DataFrame)
         # 3. Regroup by the browser id, here each group has the fingerprints
         #    sorted by the time of collection
@@ -50,8 +48,8 @@ class TestComputeAttributesInstability(unittest.TestCase):
                            ATTRIBUTES[2]: 0.0}
         self.assertDictEqual(expected_result, attributes_instability)
 
-    def test_unexistent_attribute(self):
-        self._attributes.add(UNEXISTENT_ATTRIBUTE)
+    def test_non_existent_attribute(self):
+        self._attributes.add(NON_EXISTENT_ATTRIBUTE)
         grouped_by_browser = self._get_grouped_by_browser()
         with self.assertRaises(KeyError):
             _compute_attributes_instability(grouped_by_browser,

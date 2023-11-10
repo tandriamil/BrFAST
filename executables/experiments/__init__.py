@@ -1,7 +1,8 @@
 #!/usr/bin/python3
-"""Init file of the executables.experiments module."""
+"""Init file."""
 
 import csv
+from pathlib import Path
 from typing import Dict
 
 from loguru import logger
@@ -9,7 +10,7 @@ from loguru import logger
 from brfast.data.attribute import Attribute, AttributeSet
 
 
-def read_csv_analysis_as_dict(csv_file_path: str,
+def read_csv_analysis_as_dict(csv_file_path: Path,
                               candidate_attributes: AttributeSet
                               ) -> Dict[Attribute, float]:
     """Read the result of an analysis as a csv file into a dictionary.

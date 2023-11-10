@@ -4,7 +4,6 @@
 import unittest
 
 from brfast.data.attribute import Attribute, AttributeSet, DuplicateAttributeId
-
 from tests.data import ATTRIBUTES
 
 
@@ -23,9 +22,9 @@ class TestAttribute(unittest.TestCase):
 
     def test_read_only_properties(self):
         with self.assertRaises(AttributeError):
-            self._attribute.attribute_id = 7
+            self._attribute.attribute_id = 7       # noqa
         with self.assertRaises(AttributeError):
-            self._attribute.name = 'screen_width'
+            self._attribute.name = 'screen_width'  # noqa
 
     def test_equality_new_attribute_same_id_name(self):
         # Another attribute object with the same id / name
@@ -52,13 +51,13 @@ class TestAttribute(unittest.TestCase):
     def test_inequality_with_integers(self):
         lower_id, higher_id = 1, 42
         with self.assertRaises(TypeError):
-            self._attribute > lower_id
+            return self._attribute > lower_id   # noqa
         with self.assertRaises(TypeError):
-            self._attribute < lower_id
+            return self._attribute < lower_id   # noqa
         with self.assertRaises(TypeError):
-            higher_id > self._attribute
+            return higher_id > self._attribute  # noqa
         with self.assertRaises(TypeError):
-            higher_id < self._attribute
+            return higher_id < self._attribute  # noqa
 
     def test_difference_with_integers(self):
         self.assertNotEqual(self._attribute_id, self._attribute)
@@ -79,7 +78,7 @@ class TestAttributeSet(unittest.TestCase):
         duplicated_id_attribute = Attribute(
             self._timezone.attribute_id, 'duplicated_id_attribute')
         with self.assertRaises(DuplicateAttributeId):
-            wrong_attribute_set = AttributeSet(
+            AttributeSet(
                 [self._user_agent, duplicated_id_attribute, self._timezone])
             # NOTE We used a list here as using a set would lead to the
             #      duplicated attributes having the same hash as it relies only

@@ -5,28 +5,22 @@ import importlib
 import json
 import unittest
 from math import log2
-from os import path, remove
+from os import path
 from pathlib import PurePath
-from typing import Any, Dict
-
-from brfast.config import ANALYSIS_ENGINES
-from brfast.data.attribute import Attribute, AttributeSet
-from brfast.exploration import (
-    Exploration, ExplorationNotRun, ExplorationParameters,
-    SensitivityThresholdUnreachable, State, TraceData)
-from brfast.exploration.entropy import (
-    _compute_attribute_entropy, _get_attributes_entropy, Entropy)
-from brfast.measures import UsabilityCostMeasure, SensitivityMeasure
-
-from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        UNEXISTENT_ATTRIBUTE)
-from tests.exploration import (SENSITIVITY_THRESHOLD, TRACE_FILENAME,
-                               MODIN_ANALYSIS_ENGINES)
-from tests.exploration.test_exploration import TestExploration
-from tests.measures import DummySensitivity, DummyUsabilityCostMeasure
 
 # Import the engine of the analysis module (pandas or modin)
 from brfast.config import params
+from brfast.data.attribute import AttributeSet
+from brfast.exploration import (
+    TraceData)
+from brfast.exploration.entropy import (
+    compute_attribute_entropy, get_attributes_entropy, Entropy)
+from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
+                        NON_EXISTENT_ATTRIBUTE)
+from tests.exploration import (SENSITIVITY_THRESHOLD, TRACE_FILENAME)
+from tests.exploration.test_exploration import TestExploration
+from tests.measures import DummySensitivity, DummyUsabilityCostMeasure
+
 pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 EXPECTED_TRACE_PATH = 'assets/traces/expected_trace_entropy.json'
@@ -45,31 +39,31 @@ class TestGetAttributesEntropy(unittest.TestCase):
             ATTRIBUTES[1]: log2(len(self._dataset.dataframe)),
             ATTRIBUTES[2]: 0.0
         }
-        result = _get_attributes_entropy(self._dataset, self._attribute_set)
+        result = get_attributes_entropy(self._dataset, self._attribute_set)
         # Needed due to float precision
         for attribute in self._attribute_set:
             self.assertAlmostEqual(result[attribute],
                                    expected_result[attribute])
 
-    def test_get_attributes_entropy_unexistent_attribute(self):
-        self._attribute_set.add(UNEXISTENT_ATTRIBUTE)
+    def test_get_attributes_entropy_non_existent_attribute(self):
+        self._attribute_set.add(NON_EXISTENT_ATTRIBUTE)
         with self.assertRaises(KeyError):
-            _get_attributes_entropy(self._dataset, self._attribute_set)
+            get_attributes_entropy(self._dataset, self._attribute_set)
 
     def test_get_attributes_entropy_empty_attribute_set(self):
         expected_result = {}
-        result = _get_attributes_entropy(self._dataset, AttributeSet())
+        result = get_attributes_entropy(self._dataset, AttributeSet())
         self.assertDictEqual(result, expected_result)
 
     def test_get_attributes_entropy_empty_dataset(self):
         empty_dataset = DummyEmptyDataset()
         with self.assertRaises(ValueError):
-            _get_attributes_entropy(empty_dataset, self._attribute_set)
+            get_attributes_entropy(empty_dataset, self._attribute_set)
 
     def test_get_attributes_entropy_empty_attribute_set_and_dataset(self):
         expected_result = {}
         empty_dataset = DummyEmptyDataset()
-        result = _get_attributes_entropy(empty_dataset, AttributeSet())
+        result = get_attributes_entropy(empty_dataset, AttributeSet())
         self.assertDictEqual(result, expected_result)
 
 
@@ -88,20 +82,20 @@ class TestComputeAttributeEntropy(unittest.TestCase):
             ATTRIBUTES[1]: log2(len(self._dataset.dataframe)),
             ATTRIBUTES[2]: 0.0
         }
-        attributes_entropy = _compute_attribute_entropy(
+        attributes_entropy = compute_attribute_entropy(
             self._df_w_one_fp_per_browser, self._attribute_set)
         # Needed due to float precision
         for attribute, entropy in attributes_entropy.items():
             self.assertAlmostEqual(entropy, expected_result[attribute])
 
-    def test_get_attributes_entropy_unexistent_attribute(self):
-        self._attribute_set.add(UNEXISTENT_ATTRIBUTE)
+    def test_get_attributes_entropy_non_existent_attribute(self):
+        self._attribute_set.add(NON_EXISTENT_ATTRIBUTE)
         with self.assertRaises(KeyError):
-            attributes_entropy = _compute_attribute_entropy(
+            compute_attribute_entropy(
                 self._df_w_one_fp_per_browser, self._attribute_set)
 
     def test_get_attributes_entropy_empty_attribute_set(self):
-        attributes_entropy = _compute_attribute_entropy(
+        attributes_entropy = compute_attribute_entropy(
             self._df_w_one_fp_per_browser, AttributeSet())
         self.assertFalse(attributes_entropy)
 
@@ -110,14 +104,14 @@ class TestComputeAttributeEntropy(unittest.TestCase):
         self._df_w_one_fp_per_browser = (
             self._dataset.get_df_w_one_fp_per_browser())
         with self.assertRaises(ValueError):
-            attributes_entropy = _compute_attribute_entropy(
+            compute_attribute_entropy(
                 self._df_w_one_fp_per_browser, self._attribute_set)
 
     def test_get_attributes_entropy_empty_attribute_set_and_dataset(self):
         self._dataset = DummyEmptyDataset()
         self._df_w_one_fp_per_browser = (
             self._dataset.get_df_w_one_fp_per_browser())
-        attributes_entropy = _compute_attribute_entropy(
+        attributes_entropy = compute_attribute_entropy(
             self._df_w_one_fp_per_browser, AttributeSet())
         self.assertFalse(attributes_entropy)
 
@@ -189,8 +183,8 @@ class TestEntropyMultiprocessing(TestEntropy):
     def setUp(self):
         # If we use the modin engine, we ignore the multiprocessing test as it
         # is incompatible with modin
-        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
-            self.skipTest()
+        #  if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+        #    self.skipTest('The data analysis modin.pandas is not supported')
 
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()

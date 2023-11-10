@@ -72,7 +72,7 @@ class SensitivityMeasure:
         raise NotImplementedError
 
 
-class Analysis():
+class Analysis:
     """An interface to represent an analysis of a fingerprint dataset."""
 
     def __init__(self, dataset: FingerprintDataset):

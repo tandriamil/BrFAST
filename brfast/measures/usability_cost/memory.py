@@ -10,11 +10,11 @@ from typing import Any, Dict, List
 from loguru import logger
 from sortedcontainers import SortedDict
 
+# Import the engine of the analysis module (pandas or modin)
+from brfast.config import params
 from brfast.data.attribute import Attribute, AttributeSet
 from brfast.measures import Analysis
 
-# Import the engine of the analysis module (pandas or modin)
-from brfast.config import params
 pd = importlib.import_module(params.get('DataAnalysis', 'engine'))
 
 
@@ -104,8 +104,7 @@ def _compute_attribute_avg_size(dataframe: pd.DataFrame,
 
     Args:
         dataframe: The dataframe used to compute the average size.
-        attributes_subset: The attributes for which to compute the average
-                           size.
+        attributes: The attributes for which to compute the average size.
 
     Raises:
         KeyError: One of the attribute is not in the dataset.

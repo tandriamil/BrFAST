@@ -66,7 +66,7 @@ def main():
 
 # ----- Definition of the dummy sensitivity and usability cost measure
 class DummySensitivityMeasure(SensitivityMeasure):
-    """A dummy sensivity measure that returns hard-coded values.
+    """A dummy sensitivity measure that returns hard-coded values.
 
     These values come from the example of our FPSelect paper.
     """
@@ -109,7 +109,8 @@ class DummyUsabilityCostMeasure(UsabilityCostMeasure):
         frozenset({1, 2, 3}): 30
     }
 
-    def evaluate(self, attribute_set: AttributeSet) -> float:
+    def evaluate(self, attribute_set: AttributeSet) -> tuple[int,
+                                                             dict[str, int]]:
         """Measure the usability cost of an attribute set.
 
         The usability cost measure is required to be strictly increasing as we
@@ -125,7 +126,7 @@ class DummyUsabilityCostMeasure(UsabilityCostMeasure):
         """
         attribute_cost = self.usability_costs[
             frozenset(attribute_set.attribute_ids)]
-        return (attribute_cost, {'total_cost': attribute_cost})
+        return attribute_cost, {'total_cost': attribute_cost}
 
 
 # ----- Definition of the dummy dataset
@@ -160,7 +161,7 @@ class DummyFingerprintDataset(FingerprintDataset):
         """
         self._datas = {
             MetadataField.BROWSER_ID: [1, 2, 3, 2, 3],
-            MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+            MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                          periods=5, freq='H'),
             self.attributes[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                                       'Edge'],

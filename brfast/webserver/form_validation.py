@@ -3,13 +3,11 @@
 
 from typing import Callable, Optional
 
-from flask import flash
+from flask import flash, Request
 from loguru import logger
-from werkzeug.local import LocalProxy
 from werkzeug.utils import secure_filename
 
 from brfast.config import params
-
 
 ALLOWED_EXTENSIONS = {'csv', 'json'}
 
@@ -33,7 +31,7 @@ def allowed_extension(filename: str, expected_extension: str = None):
     return extension in ALLOWED_EXTENSIONS
 
 
-def erroneous_field(request: LocalProxy, field_name: str,
+def erroneous_field(request: Request, field_name: str,
                     verification: Callable[[str], bool], error_message: str
                     ) -> Optional[str]:
     """Check whether a field of a POST request is erroneous or not.
@@ -43,7 +41,7 @@ def erroneous_field(request: LocalProxy, field_name: str,
 
     Args:
         request: The request into which the parameter is checked.
-        field_name: The name of the POST request field contaning the value.
+        field_name: The name of the POST request field containing the value.
         verification: A callable that checks the string value.
         error_message: The error message to display if the value is incorrect.
 
@@ -63,11 +61,11 @@ def erroneous_field(request: LocalProxy, field_name: str,
         logger.error(error_message)
         return error_message
 
-    # If everyting is fine, return None
+    # If everything is fine, return None
     return None
 
 
-def erroneous_post_file(request: LocalProxy, field_name: str,
+def erroneous_post_file(request: Request, field_name: str,
                         expected_extension: Optional[str] = None
                         ) -> Optional[str]:
     """Check whether a file in a POST request is erroneous or not.
@@ -77,7 +75,7 @@ def erroneous_post_file(request: LocalProxy, field_name: str,
 
     Args:
         request: The request into which the file is checked.
-        field_name: The name of the POST request field contaning the file.
+        field_name: The name of the POST request field containing the file.
         expected_extension: The expected extension of the file.
 
     Returns:

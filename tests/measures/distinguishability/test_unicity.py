@@ -2,16 +2,14 @@
 """Test module of the brfast.measures.distinguishability.entropy module."""
 
 import unittest
-from math import log2
 from os import remove
 
-from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.attribute import AttributeSet
 from brfast.measures.distinguishability.unicity import (
     AttributeSetUnicity, TOTAL_BROWSERS_RESULT, UNIQUE_FPS_RESULT,
     UNICITY_RATE_RESULT)
-
 from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        UNEXISTENT_ATTRIBUTE)
+                        NON_EXISTENT_ATTRIBUTE)
 
 CSV_RESULT_PATH = 'unicity_analysis_csv_result.csv'
 WONT_COMPUTE = 0
@@ -55,8 +53,8 @@ class TestAttributeSetUnicity(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check_unicity_result(WONT_COMPUTE)
 
-    def test_unexistent_attribute(self):
-        self._attribute_set.add(UNEXISTENT_ATTRIBUTE)
+    def test_non_existent_attribute(self):
+        self._attribute_set.add(NON_EXISTENT_ATTRIBUTE)
         with self.assertRaises(KeyError):
             self.check_unicity_result(WONT_COMPUTE)
 

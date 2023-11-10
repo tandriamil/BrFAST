@@ -5,17 +5,17 @@ import importlib
 import operator
 from typing import List
 
+# Import the engine of the analysis module (pandas or modin)
+from brfast.config import params
 from brfast.data.attribute import Attribute, AttributeSet
 from brfast.data.dataset import (
     FingerprintDataset, FingerprintDatasetFromFile, MetadataField)
 
-# Import the engine of the analysis module (pandas or modin)
-from brfast.config import params
 pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 ATTRIBUTES = [Attribute(1, 'user_agent'), Attribute(2, 'timezone'),
               Attribute(3, 'do_not_track')]
-UNEXISTENT_ATTRIBUTE = Attribute(42, 'missing_from_dataset')
+NON_EXISTENT_ATTRIBUTE = Attribute(42, 'missing_from_dataset')
 
 
 # ==================== FingerprintDataset Implementations =====================
@@ -24,7 +24,7 @@ class DummyFingerprintDataset(FingerprintDataset):
 
     DATAS = {
         MetadataField.BROWSER_ID: [1, 2, 3, 2, 3],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -50,7 +50,7 @@ class DummyDatasetMissingBrowserId(DummyFingerprintDataset):
     """A dummy fingerprint dataset with the browser_id metadata missing."""
 
     DATAS = {
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -89,7 +89,7 @@ class DummyCleanDataset(DummyFingerprintDataset):
 
     DATAS = {
         MetadataField.BROWSER_ID: [1, 2, 3, 4, 5],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -112,7 +112,7 @@ class DummyFingerprintDatasetMissingSetCandidateAttributes(FingerprintDataset):
 
     DATAS = {
         MetadataField.BROWSER_ID: [1, 2, 3, 2, 3],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -145,7 +145,7 @@ class DummyFPDatasetFromFile(FingerprintDatasetFromFile):
 
     DATAS = {
         MetadataField.BROWSER_ID: [1, 2, 3, 2, 3],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],
@@ -169,7 +169,7 @@ class DummyFPCleanDatasetDatasetFromFile(DummyFPDatasetFromFile):
 
     DATAS = {
         MetadataField.BROWSER_ID: [1, 2, 3, 4, 5],
-        MetadataField.TIME_OF_COLLECT: pd.date_range(('2021-03-12'),
+        MetadataField.TIME_OF_COLLECT: pd.date_range('2021-03-12',
                                                      periods=5, freq='H'),
         ATTRIBUTES[0].name: ['Firefox', 'Chrome', 'Edge', 'Chrome',
                              'Edge'],

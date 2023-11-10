@@ -7,7 +7,6 @@ from typing import Any, List
 
 from brfast.data.attribute import AttributeSet
 from brfast.measures import Analysis, SensitivityMeasure, UsabilityCostMeasure
-
 from tests.data import DummyCleanDataset
 
 CSV_RESULT_PATH = 'dummy_analysis_csv_result.csv'

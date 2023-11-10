@@ -1,27 +1,22 @@
 #!/usr/bin/python3
 """Test module of the exploration module of BrFAST."""
 
-import importlib
 import json
 import unittest
-from typing import Any, Dict, List, Optional, Set
-from pathlib import PurePath
 from os import path, remove
-
-from sortedcontainers import SortedDict
+from pathlib import PurePath
+from typing import List, Optional, Set
 
 from brfast.config import ANALYSIS_ENGINES, params
 from brfast.data.attribute import AttributeSet
 from brfast.exploration import (
     Exploration, ExplorationNotRun, ExplorationParameters,
-    SensitivityThresholdUnreachable, State, TraceData)
-
+    SensitivityThresholdUnreachable, TraceData)
 from tests.data import ATTRIBUTES, DummyCleanDataset
 from tests.exploration import (
     DUMMY_PARAMETER, DummyExploration, SENSITIVITY_THRESHOLD, TRACE_FILENAME,
     MODIN_ANALYSIS_ENGINES)
-from tests.measures import (DummySensitivity, DummyUsabilityCostMeasure,
-                            SENSITIVITIES, TOTAL_COST_FIELD, USABILITIES)
+from tests.measures import (DummySensitivity, DummyUsabilityCostMeasure)
 from tests.utils import remove_key_if_present
 
 EXPECTED_TRACE_PATH = 'assets/traces/expected_trace_dummy_exploration.json'
@@ -104,9 +99,9 @@ class TestExploration(unittest.TestCase):
         # Compare the two obtained dictionaries
         self.assertDictEqual(exploration_parameters, expected_parameters)
 
-        # Check that the parameters property is not writtable
+        # Check that the parameters property is not writable
         with self.assertRaises(AttributeError):
-            self._exploration.parameters = {'refused_as_it_is': 'readonly'}
+            self._exploration.parameters = {'refused_as_it_is': 'readonly'}  # noqa
 
     def test_parameters(self):
         additional_parameters = DUMMY_PARAMETER
@@ -304,8 +299,8 @@ class TestExplorationMultiprocessing(TestExploration):
     def setUp(self):
         # If we use the modin engine, we ignore the multiprocessing test as it
         # is incompatible with modin
-        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
-            self.skipTest()
+        #  if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+        #    self.skipTest('The data analysis modin.pandas is not supported')
 
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()

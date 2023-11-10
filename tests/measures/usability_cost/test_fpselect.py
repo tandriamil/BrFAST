@@ -8,7 +8,6 @@ from brfast.data.attribute import Attribute, AttributeSet
 from brfast.measures.usability_cost.fpselect import (
     IncorrectWeightDimensions, MemoryInstability, MemoryInstabilityTime,
     CostDimension)
-
 from tests.data import ATTRIBUTES
 
 SIZES = {ATTRIBUTES[0]: 52.25, ATTRIBUTES[1]: 42.56, ATTRIBUTES[2]: 1}

@@ -8,26 +8,20 @@ our FPSelect paper.
 import importlib
 import json
 import unittest
-from math import log2
-from os import path, remove
+from os import path
 from pathlib import PurePath
-from typing import Any, Dict
 
-from brfast.config import ANALYSIS_ENGINES
+# Import the engine of the analysis module (pandas or modin)
+from brfast.config import params
 from brfast.data.attribute import AttributeSet
 from brfast.exploration import (
-    Exploration, ExplorationNotRun, ExplorationParameters,
-    SensitivityThresholdUnreachable, State, TraceData)
+    SensitivityThresholdUnreachable, TraceData)
 from brfast.exploration.fpselect import FPSelect, FPSelectParameters
-from brfast.measures import UsabilityCostMeasure, SensitivityMeasure
-
 from tests.data import ATTRIBUTES, DummyCleanDataset
 from tests.exploration import SENSITIVITY_THRESHOLD, TRACE_FILENAME
 from tests.exploration.test_exploration import TestExploration
 from tests.measures import DummySensitivity, DummyUsabilityCostMeasure
 
-# Import the engine of the analysis module (pandas or modin)
-from brfast.config import params
 pd = importlib.import_module(params['DataAnalysis']['engine'])
 
 TRACES_DIRECTORY = 'assets/traces'
@@ -35,11 +29,11 @@ EXPECTED_TRACE_PATH_MULTIPATH_PRUNING_ON = '/'.join(
     [TRACES_DIRECTORY, 'expected_trace_fpselect_multipath_pruning_on.json'])
 EXPECTED_TRACE_PATH_MULTIPATH_PRUNING_OFF = '/'.join(
     [TRACES_DIRECTORY, 'expected_trace_fpselect_multipath_pruning_off.json'])
-EXPECTED_TRACE_PATH_SINGLEPATH_PRUNING_ON = '/'.join(
-    [TRACES_DIRECTORY, 'expected_trace_fpselect_singlepath_pruning_on.json'])
-EXPECTED_TRACE_PATH_SINGLEPATH_PRUNING_OFF = '/'.join(
-    [TRACES_DIRECTORY, 'expected_trace_fpselect_singlepath_pruning_off.json'])
-MULTI_EXPLR_PATHS = 2
+EXPECTED_TRACE_PATH_SINGLE_PATH_PRUNING_ON = '/'.join(
+    [TRACES_DIRECTORY, 'expected_trace_fpselect_single_path_pruning_on.json'])
+EXPECTED_TRACE_PATH_SINGLE_PATH_PRUNING_OFF = '/'.join(
+    [TRACES_DIRECTORY, 'expected_trace_fpselect_single_path_pruning_off.json'])
+MULTI_EXPLORED_PATHS = 2
 PRUNING_ON = True
 PRUNING_OFF = False
 
@@ -53,7 +47,7 @@ class TestFPSelectSinglePathPruningOn(TestExploration):
         self._usability_cost_measure = DummyUsabilityCostMeasure()
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
         self._trace_path = TRACE_FILENAME
-        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLEPATH_PRUNING_ON
+        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLE_PATH_PRUNING_ON
         self._explored_paths = 1
         self._pruning = PRUNING_ON
         self._exploration = FPSelect(
@@ -176,7 +170,7 @@ class TestFPSelectSinglePathPruningOff(TestFPSelectSinglePathPruningOn):
         self._usability_cost_measure = DummyUsabilityCostMeasure()
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
         self._trace_path = TRACE_FILENAME
-        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLEPATH_PRUNING_OFF
+        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLE_PATH_PRUNING_OFF
         self._explored_paths = 1
         self._pruning = PRUNING_OFF
         self._exploration = FPSelect(
@@ -195,7 +189,7 @@ class TestFPSelectMultipathPruningOn(TestFPSelectSinglePathPruningOn):
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
         self._trace_path = TRACE_FILENAME
         self._expected_trace_path = EXPECTED_TRACE_PATH_MULTIPATH_PRUNING_ON
-        self._explored_paths = MULTI_EXPLR_PATHS
+        self._explored_paths = MULTI_EXPLORED_PATHS
         self._pruning = PRUNING_ON
         self._exploration = FPSelect(
             self._sensitivity_measure, self._usability_cost_measure,
@@ -214,7 +208,7 @@ class TestFPSelectMultipathPruningOff(TestFPSelectSinglePathPruningOn):
         self._trace_path = TRACE_FILENAME
         self._expected_trace_path = EXPECTED_TRACE_PATH_MULTIPATH_PRUNING_OFF
         self._pruning = PRUNING_OFF
-        self._explored_paths = MULTI_EXPLR_PATHS
+        self._explored_paths = MULTI_EXPLORED_PATHS
         self._exploration = FPSelect(
             self._sensitivity_measure, self._usability_cost_measure,
             self._dataset, self._sensitivity_threshold,
@@ -224,20 +218,22 @@ class TestFPSelectMultipathPruningOff(TestFPSelectSinglePathPruningOn):
 
 
 # ========== FPSelect using multiprocessing and the DummyCleanDataset =========
-class TestFPSelectSinglePathPruningOnMultiprocessing(TestFPSelectSinglePathPruningOn):
+class TestFPSelectSinglePathPruningOnMultiprocessing(
+        TestFPSelectSinglePathPruningOn
+):
 
     def setUp(self):
         # If we use the modin engine, we ignore the multiprocessing test as it
         # is incompatible with modin
-        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
-            self.skipTest()
+        #  if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+        #    self.skipTest('The data analysis modin.pandas is not supported')
 
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()
         self._usability_cost_measure = DummyUsabilityCostMeasure()
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
         self._trace_path = TRACE_FILENAME
-        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLEPATH_PRUNING_ON
+        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLE_PATH_PRUNING_ON
         self._explored_paths = 1
         self._pruning = PRUNING_ON
         self._exploration = FPSelect(
@@ -247,20 +243,21 @@ class TestFPSelectSinglePathPruningOnMultiprocessing(TestFPSelectSinglePathPruni
         params.set('Multiprocessing', 'explorations', 'true')
 
 
-class TestFPSelectSinglePathPruningOffMultiprocessing(TestFPSelectSinglePathPruningOnMultiprocessing):
+class TestFPSelectSinglePathPruningOffMultiprocessing(
+        TestFPSelectSinglePathPruningOnMultiprocessing):
 
     def setUp(self):
         # If we use the modin engine, we ignore the multiprocessing test as it
         # is incompatible with modin
-        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
-            self.skipTest()
+        #  if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+        #    self.skipTest('The data analysis modin.pandas is not supported')
 
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()
         self._usability_cost_measure = DummyUsabilityCostMeasure()
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
         self._trace_path = TRACE_FILENAME
-        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLEPATH_PRUNING_OFF
+        self._expected_trace_path = EXPECTED_TRACE_PATH_SINGLE_PATH_PRUNING_OFF
         self._explored_paths = 1
         self._pruning = PRUNING_OFF
         self._exploration = FPSelect(
@@ -270,13 +267,14 @@ class TestFPSelectSinglePathPruningOffMultiprocessing(TestFPSelectSinglePathPrun
         params.set('Multiprocessing', 'explorations', 'true')
 
 
-class TestFPSelectMultipathPruningOnMultiprocessing(TestFPSelectSinglePathPruningOnMultiprocessing):
+class TestFPSelectMultipathPruningOnMultiprocessing(
+        TestFPSelectSinglePathPruningOnMultiprocessing):
 
     def setUp(self):
         # If we use the modin engine, we ignore the multiprocessing test as it
         # is incompatible with modin
-        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
-            self.skipTest()
+        #  if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+        #    self.skipTest('The data analysis modin.pandas is not supported')
 
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()
@@ -284,7 +282,7 @@ class TestFPSelectMultipathPruningOnMultiprocessing(TestFPSelectSinglePathPrunin
         self._sensitivity_threshold = SENSITIVITY_THRESHOLD
         self._trace_path = TRACE_FILENAME
         self._expected_trace_path = EXPECTED_TRACE_PATH_MULTIPATH_PRUNING_ON
-        self._explored_paths = MULTI_EXPLR_PATHS
+        self._explored_paths = MULTI_EXPLORED_PATHS
         self._pruning = PRUNING_ON
         self._exploration = FPSelect(
             self._sensitivity_measure, self._usability_cost_measure,
@@ -293,13 +291,14 @@ class TestFPSelectMultipathPruningOnMultiprocessing(TestFPSelectSinglePathPrunin
         params.set('Multiprocessing', 'explorations', 'true')
 
 
-class TestFPSelectMultipathPruningOffMultiprocessing(TestFPSelectSinglePathPruningOnMultiprocessing):
+class TestFPSelectMultipathPruningOffMultiprocessing(
+        TestFPSelectSinglePathPruningOnMultiprocessing):
 
     def setUp(self):
         # If we use the modin engine, we ignore the multiprocessing test as it
         # is incompatible with modin
-        if params.get('DataAnalysis', 'engine') == 'modin.pandas':
-            self.skipTest()
+        #  if params.get('DataAnalysis', 'engine') == 'modin.pandas':
+        #    self.skipTest('The data analysis modin.pandas is not supported')
 
         self._dataset = DummyCleanDataset()
         self._sensitivity_measure = DummySensitivity()
@@ -308,7 +307,7 @@ class TestFPSelectMultipathPruningOffMultiprocessing(TestFPSelectSinglePathPruni
         self._trace_path = TRACE_FILENAME
         self._expected_trace_path = EXPECTED_TRACE_PATH_MULTIPATH_PRUNING_OFF
         self._pruning = PRUNING_OFF
-        self._explored_paths = MULTI_EXPLR_PATHS
+        self._explored_paths = MULTI_EXPLORED_PATHS
         self._exploration = FPSelect(
             self._sensitivity_measure, self._usability_cost_measure,
             self._dataset, self._sensitivity_threshold,

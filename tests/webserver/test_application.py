@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 """Test module of the brfast.webserver.application module."""
 
-import unittest
 import mimetypes
+import unittest
 from http import HTTPStatus
 from os import path
 from pathlib import PurePath

@@ -3,8 +3,6 @@
 
 from typing import Any
 
-import brfast.utils
-
 
 def remove_key_if_present(dictionary: dict, key: Any):
     """Remove a key from a dictionary if it is present.

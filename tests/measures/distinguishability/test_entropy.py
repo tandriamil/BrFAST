@@ -5,13 +5,12 @@ import unittest
 from math import log2
 from os import remove
 
-from brfast.data.attribute import Attribute, AttributeSet
+from brfast.data.attribute import AttributeSet
 from brfast.measures.distinguishability.entropy import (
     attribute_set_entropy, AttributeSetEntropy, ENTROPY_RESULT,
     MAXIMUM_ENTROPY_RESULT, NORMALIZED_ENTROPY_RESULT)
-
 from tests.data import (ATTRIBUTES, DummyCleanDataset, DummyEmptyDataset,
-                        UNEXISTENT_ATTRIBUTE)
+                        NON_EXISTENT_ATTRIBUTE)
 
 CSV_RESULT_PATH = 'entropy_analysis_csv_result.csv'
 WONT_COMPUTE = 0.0
@@ -50,8 +49,8 @@ class TestAttributeSetEntropyFunction(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check_entropy_result(WONT_COMPUTE)
 
-    def test_unexistent_attribute(self):
-        self._attribute_set.add(UNEXISTENT_ATTRIBUTE)
+    def test_non_existent_attribute(self):
+        self._attribute_set.add(NON_EXISTENT_ATTRIBUTE)
         with self.assertRaises(KeyError):
             self.check_entropy_result(WONT_COMPUTE)
 
@@ -109,8 +108,8 @@ class TestAttributeSetEntropy(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check_entropy_result(WONT_COMPUTE)
 
-    def test_unexistent_attribute(self):
-        self._attribute_set.add(UNEXISTENT_ATTRIBUTE)
+    def test_non_existent_attribute(self):
+        self._attribute_set.add(NON_EXISTENT_ATTRIBUTE)
         with self.assertRaises(KeyError):
             self.check_entropy_result(WONT_COMPUTE)
 

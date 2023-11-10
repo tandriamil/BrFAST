@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Run the Flask webserver. Note that it is multithreaded by default."""
+"""Run the Flask webserver, on multiple threads by default."""
 
 import secrets
 from csv import DictReader
@@ -15,16 +15,16 @@ from loguru import logger
 from brfast.config import params
 from brfast.data.attribute import Attribute, AttributeSet
 from brfast.data.dataset import (FingerprintDatasetFromCSVInMemory,
-                                 MissingMetadatasFields)
+                                 MissingMetadataFields)
 from brfast.exploration import ExplorationParameters, State, TraceData
 from brfast.exploration.conditional_entropy import ConditionalEntropy
 from brfast.exploration.entropy import Entropy
 from brfast.exploration.fpselect import FPSelect
-from brfast.measures.sample.attribute_subset import AttributeSetSample
 from brfast.measures.distinguishability.entropy import AttributeSetEntropy
 from brfast.measures.distinguishability.unicity import (
     AttributeSetUnicity, UNICITY_RATE_RESULT, UNIQUE_FPS_RESULT,
     TOTAL_BROWSERS_RESULT)
+from brfast.measures.sample.attribute_subset import AttributeSetSample
 from brfast.measures.sensitivity.fpselect import TopKFingerprints
 from brfast.measures.usability_cost.fpselect import (
     CostDimension, MemoryInstability, MemoryInstabilityTime)
@@ -32,7 +32,6 @@ from brfast.utils.conversion import is_str_float
 from brfast.webserver.files_verification import trace_file_errors
 from brfast.webserver.form_validation import (
     erroneous_field, erroneous_post_file)
-
 
 # The Flask application
 app = Flask(__name__)
@@ -59,6 +58,9 @@ FINGERPRINT_DATASET = None
 TRACE_DATA = None
 REAL_TIME_EXPLORATION = None
 EXPLORATION_PROCESS = None
+
+# The templates
+TRACE_CONFIGURATION_TEMPLATE = 'trace-configuration.html'
 
 
 @app.route('/')
@@ -90,22 +92,22 @@ def trace_configuration():
         trace_file_error_message = erroneous_post_file(
             request, 'trace-file', expected_extension='json')
         if trace_file_error_message:
-            return render_template('trace-configuration.html')
+            return render_template(TRACE_CONFIGURATION_TEMPLATE)
 
         # Load the content of the trace file as a dictionary from the json
         try:
             TRACE_DATA = json.load(request.files['trace-file'])
         except JSONDecodeError:
-            error_message = 'The trace file is not correctly formated.'
+            error_message = 'The trace file is not correctly formatted.'
             flash(error_message, params.get('WebServer', 'flash_error_class'))
             logger.error(error_message)
-            return render_template('trace-configuration.html')
+            return render_template(TRACE_CONFIGURATION_TEMPLATE)
 
         # Check the content of the trace file
         if error_message := trace_file_errors(TRACE_DATA):
             flash(error_message, params.get('WebServer', 'flash_error_class'))
             logger.error(error_message)
-            return render_template('trace-configuration.html')
+            return render_template(TRACE_CONFIGURATION_TEMPLATE)
 
         logger.info('The trace is correct and set.')
         # --------- End of the management of the required trace file ----------
@@ -125,7 +127,7 @@ def trace_configuration():
                     FINGERPRINT_DATASET = FingerprintDatasetFromCSVInMemory(
                         request.files['fingerprint-dataset'])
                     logger.debug('The fingerprint dataset is set.')
-                except MissingMetadatasFields as mmf_error:
+                except MissingMetadataFields as mmf_error:
                     error_message = ('Ignored the fingerprint dataset due to '
                                      'the error: ' + str(mmf_error))
                     flash(error_message, params.get('WebServer',
@@ -138,7 +140,7 @@ def trace_configuration():
         # -------------------- End of POST request handle ---------------------
 
     # GET request handle: just show the trace configuration page
-    return render_template('trace-configuration.html')
+    return render_template(TRACE_CONFIGURATION_TEMPLATE)
 
 
 @app.route('/trace-replay')
@@ -179,6 +181,13 @@ def real_time_exploration_configuration():
 
     # -------------------------- POST request handle --------------------------
     if request.method == 'POST':
+        # Initialize some variables in case of
+        mem_inst_time_usability_cost, most_common_fingerprints = None, None
+        usability_cost_measure, collection_time_costs = None, None
+        memory_costs, instability_costs = None, None
+        explored_paths, sensitivity_threshold = None, None
+        use_pruning_methods = None
+
         # Clear the previous data if there were some
         TRACE_DATA, FINGERPRINT_DATASET = None, None
         if EXPLORATION_PROCESS:
@@ -212,6 +221,7 @@ def real_time_exploration_configuration():
             'The exploration method is unknown.')
         if exploration_method_error_message:
             errors['exploration-method'] = exploration_method_error_message
+            exploration_method = None
         else:
             exploration_method = request.form['exploration-method']
         # --------------- End of handle the exploration method ----------------
@@ -247,6 +257,7 @@ def real_time_exploration_configuration():
             'Unknown sensitivity measure.')
         if sensitivity_measure_error_message:
             errors['sensitivity-measure'] = sensitivity_measure_error_message
+            sensitivity_measure = None
         else:
             sensitivity_measure = request.form['sensitivity-measure']
         # -------------- End of handle the sensitivity measure ----------------
@@ -270,6 +281,7 @@ def real_time_exploration_configuration():
                 f'[{minimum_common_fps}; {maximum_common_fps}].')
             if top_k_fps_error_message:
                 errors['most-common-fingerprints'] = top_k_fps_error_message
+                most_common_fingerprints = None
             else:
                 most_common_fingerprints = int(
                     request.form['most-common-fingerprints'])
@@ -281,9 +293,9 @@ def real_time_exploration_configuration():
             FINGERPRINT_DATASET = FingerprintDatasetFromCSVInMemory(
                 request.files['fingerprint-dataset'])
 
-            # We will need the candidate attributes afterwards
+            # We will need the candidate attributes afterward
             candidate_attributes = FINGERPRINT_DATASET.candidate_attributes
-        except MissingMetadatasFields as mmf_error:
+        except MissingMetadataFields as mmf_error:
             error_message = str(mmf_error)
             flash(error_message, params.get('WebServer', 'flash_error_class'))
             logger.error(error_message)
@@ -296,12 +308,12 @@ def real_time_exploration_configuration():
         cost_dim_weights = {}
 
         # Check the chosen usability cost measure
-        usab_cost_meas_error_message = erroneous_field(
+        usability_cost_meas_error_message = erroneous_field(
             request, 'usability-cost-measure',
             lambda v: v in usability_cost_measures,
             'Unknown usability cost measure.')
-        if usab_cost_meas_error_message:
-            errors['usability-cost-measure'] = usab_cost_meas_error_message
+        if usability_cost_meas_error_message:
+            errors['usability-cost-measure'] = usability_cost_meas_error_message
         else:
             usability_cost_measure = request.form['usability-cost-measure']
             # All the usability cost measures for now include the memory cost
@@ -346,18 +358,20 @@ def real_time_exploration_configuration():
                         break  # Exit the for loop
 
             # The instability cost results
-            instab_file_error_message = erroneous_post_file(
+            instability_file_error_message = erroneous_post_file(
                 request, 'instability-cost-results', expected_extension='csv')
-            if instab_file_error_message:
-                errors['instability-cost-results'] = instab_file_error_message
+            if instability_file_error_message:
+                errors['instability-cost-results'] = (
+                    instability_file_error_message)
 
             # The instability cost weight
-            instab_weight_error_message = erroneous_field(
+            instability_weight_error_message = erroneous_field(
                 request, 'instability-cost-weight',
                 lambda v: v and is_str_float(v) and float(v) >= 0.0,
                 'The instability cost weight should be a positive float.')
-            if instab_weight_error_message:
-                errors['instability-cost-weight'] = instab_weight_error_message
+            if instability_weight_error_message:
+                errors['instability-cost-weight'] = (
+                    instability_weight_error_message)
             else:
                 cost_dim_weights[CostDimension.INSTABILITY] = float(
                     request.form['instability-cost-weight'])
@@ -386,8 +400,8 @@ def real_time_exploration_configuration():
                         break  # Exit the for loop
 
             # If there is also the collection time to consider
-            mem_inst_time_usab_cost = usability_cost_measures[1]
-            if usability_cost_measure == mem_inst_time_usab_cost:
+            mem_inst_time_usability_cost = usability_cost_measures[1]
+            if usability_cost_measure == mem_inst_time_usability_cost:
                 # The collection time cost results
                 ct_file_err_mess = erroneous_post_file(
                     request, 'collection-time-cost-results',
@@ -446,19 +460,19 @@ def real_time_exploration_configuration():
                          f'{actual_sens_meas}.')
 
             # --- Initialize the usability cost measure
-            usab_cost_meas_class = USABILITY_COST_MEASURES[
+            usability_cost_measure_class = USABILITY_COST_MEASURES[
                 usability_cost_measure]
 
-            if usability_cost_measure == mem_inst_time_usab_cost:
+            if usability_cost_measure == mem_inst_time_usability_cost:
                 # Initialize the memory, instability, and collection time
-                actual_usab_cost_meas = usab_cost_meas_class(
+                actual_usability_cost_meas = usability_cost_measure_class(
                     memory_costs, instability_costs, collection_time_costs,
                     cost_dim_weights)
             else:
-                actual_usab_cost_meas = usab_cost_meas_class(
+                actual_usability_cost_meas = usability_cost_measure_class(
                     memory_costs, instability_costs, cost_dim_weights)
             logger.debug('Initialized the usability cost measure '
-                         f'{actual_usab_cost_meas}.')
+                         f'{actual_usability_cost_meas}.')
 
             # --- Initialize the exploration class
             exploration_class = EXPLORATION_METHODS[exploration_method]
@@ -466,12 +480,12 @@ def real_time_exploration_configuration():
             # If FPSelect
             if exploration_method == fpselect_method_name:
                 exploration = exploration_class(
-                    actual_sens_meas, actual_usab_cost_meas,
+                    actual_sens_meas, actual_usability_cost_meas,
                     FINGERPRINT_DATASET, sensitivity_threshold, explored_paths,
                     use_pruning_methods)
             else:
                 exploration = exploration_class(
-                    actual_sens_meas, actual_usab_cost_meas,
+                    actual_sens_meas, actual_usability_cost_meas,
                     FINGERPRINT_DATASET, sensitivity_threshold)
             logger.debug(f'Initialized the exploration {exploration}.')
 
@@ -559,7 +573,7 @@ def download_trace():
 
     Note:
         The file will be saved in the configured upload folder and WILL NOT be
-        deleted afterwards. A trick is to use the /tmp directory for them to be
+        deleted afterward. A trick is to use the /tmp directory for them to be
         automatically deleted.
 
     Returns:
@@ -579,7 +593,7 @@ def download_trace():
         logger.error(error_message)
         abort(HTTPStatus.NOT_FOUND, description=error_message)
 
-    # If there is an exploration but it has not finished yet
+    # If there is an exploration, but it has not finished yet
     elif EXPLORATION_PROCESS.is_alive():
         error_message = 'Please wait for the exploration to finish.'
         logger.error(error_message)
@@ -654,6 +668,7 @@ def attribute_set_information(attribute_set_id: int):
         abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     # Generate the attribute set object and get the names of these attributes
+    attributes = None
     if REAL_TIME_EXPLORATION:
         attributes = AttributeSet(
             FINGERPRINT_DATASET.candidate_attributes.get_attribute_by_id(
@@ -699,14 +714,15 @@ def attribute_set_information(attribute_set_id: int):
     #                      percentage of the cost of the candidate attributes)
     # }
     usability_cost_ratio = {}
+    candidate_attributes_infos = None
     if REAL_TIME_EXPLORATION:
         candidate_attributes_infos = (
             REAL_TIME_EXPLORATION.get_explored_attribute_sets(0, 1)[0])
     elif TRACE_DATA:
         candidate_attributes_infos = TRACE_DATA['exploration'][0]
     bootstrap_progress_bars = (params
-                              .get('WebServer', 'bootstrap_progress_bars')
-                              .splitlines())
+                               .get('WebServer', 'bootstrap_progress_bars')
+                               .splitlines())
 
     # The total usability cost
     cost_percentage = (100 * attribute_set_infos['usability_cost']
@@ -787,6 +803,7 @@ def attribute_set_entropy(attribute_set_id: int):
         abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     # Generate the attribute set object
+    attributes = None
     if REAL_TIME_EXPLORATION:
         attributes = AttributeSet(
             FINGERPRINT_DATASET.candidate_attributes.get_attribute_by_id(
@@ -853,6 +870,7 @@ def attribute_set_unicity(attribute_set_id: int):
         abort(HTTPStatus.NOT_FOUND, description=error_message)
 
     # Generate the attribute set object
+    attributes = None
     if REAL_TIME_EXPLORATION:
         attributes = AttributeSet(
             FINGERPRINT_DATASET.candidate_attributes.get_attribute_by_id(

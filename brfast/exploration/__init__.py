@@ -8,7 +8,7 @@ from multiprocessing import Manager, Process
 from typing import Any, Dict, List, Optional, Set
 
 from loguru import logger
-from sortedcontainers import SortedDict, SortedList
+from sortedcontainers import SortedDict
 
 from brfast.config import ANALYSIS_ENGINES, params
 from brfast.data.attribute import AttributeSet
@@ -28,7 +28,7 @@ class Exploration:
             sensitivity_measure: The sensitivity measure.
             usability_cost_measure: The usability cost.
             dataset: The fingerprint dataset.
-            sensitivity_threshold: The sensivity threshold.
+            sensitivity_threshold: The sensitivity threshold.
         """
         self._sensitivity = sensitivity_measure
         self._usability_cost = usability_cost_measure
@@ -67,9 +67,9 @@ class Exploration:
         Returns:
             A string representation of this instance of FPSelect.
         """
-        str_informations = ', '. join(
+        str_information = ', '. join(
             f'{key} = {value}' for key, value in self.parameters.items())
-        return f'{self.__class__.__name__}({str_informations})'
+        return f'{self.__class__.__name__}({str_information})'
 
     def run(self):
         """Run the search for a solution for the attribute search problem.
@@ -87,7 +87,7 @@ class Exploration:
         # Then, check that the sensitivity threshold is reachable
         if not self._is_sensitivity_threshold_reachable():
             warning_message = (
-                f'The sensivity threshold of {self._sensitivity_threshold} '
+                f'The sensitivity threshold of {self._sensitivity_threshold} '
                 'is not reachable even using all the '
                 f'{len(self._dataset.candidate_attributes)} candidate '
                 'attributes.')
@@ -129,7 +129,7 @@ class Exploration:
         # Then, check that the sensitivity threshold is reachable
         if not self._is_sensitivity_threshold_reachable():
             logger.warning(
-                f'The sensivity threshold of {self._sensitivity_threshold} '
+                f'The sensitivity threshold of {self._sensitivity_threshold} '
                 'is not reachable even using all the '
                 f'{len(self._dataset.candidate_attributes)} candidate '
                 'attributes.')
@@ -200,14 +200,14 @@ class Exploration:
                      f'explained as {max_cost_explanation}.')
 
         # Compute the sensitivity considering the complete set of attributes
-        sensitivity_canditate_attributes = self._sensitivity.evaluate(
+        sensitivity_candidate_attributes = self._sensitivity.evaluate(
             self._dataset.candidate_attributes)
-        logger.debug('The minimum sensivity threshold is of '
-                     f'{sensitivity_canditate_attributes}.')
+        logger.debug('The minimum sensitivity threshold is of '
+                     f'{sensitivity_candidate_attributes}.')
 
-        # Check if the minimum sensitivity satifies the threshold
+        # Check if the minimum sensitivity satisfies the threshold
         min_sensitivity_satisfies_threshold = (
-            sensitivity_canditate_attributes <= self._sensitivity_threshold)
+            sensitivity_candidate_attributes <= self._sensitivity_threshold)
         if min_sensitivity_satisfies_threshold:
             candidate_attributes_state = State.SATISFYING
             self._add_satisfying_attribute_set(
@@ -221,7 +221,7 @@ class Exploration:
             TraceData.TIME: compute_time,
             TraceData.ATTRIBUTES: (
                 self._dataset.candidate_attributes.attribute_ids),
-            TraceData.SENSITIVITY: sensitivity_canditate_attributes,
+            TraceData.SENSITIVITY: sensitivity_candidate_attributes,
             TraceData.USABILITY_COST: self._max_cost,
             TraceData.COST_EXPLANATION: max_cost_explanation,
             TraceData.STATE: candidate_attributes_state
@@ -364,7 +364,7 @@ class Exploration:
             return list(self._explored_attr_sets[start_id:])
         return list(self._explored_attr_sets[start_id:end_id])
 
-    def _add_explored_attribute_set(self, new_attribute_set: AttributeSet):
+    def _add_explored_attribute_set(self, new_attribute_set: Dict[str, Any]):
         """Add a new attribute set that was explored.
 
         Args:
@@ -404,14 +404,13 @@ class Exploration:
         self._check_exploration_state()
         logger.info(f'Saving the exploration trace to {save_path}...')
 
-        # The json dictionary to save (as a python dict)
-        json_output = {}
-
         # Information about the parameters of the exploration
-        json_output[TraceData.PARAMETERS] = self.parameters
+        json_output = {
+            TraceData.PARAMETERS: self.parameters,
+            TraceData.ATTRIBUTES: SortedDict()
+        }
 
         # Information about the attributes
-        json_output[TraceData.ATTRIBUTES] = SortedDict()
         for attribute in self._dataset.candidate_attributes:
             json_output[TraceData.ATTRIBUTES][attribute.attribute_id] = (
                 attribute.name)
@@ -433,9 +432,9 @@ class Exploration:
         # Information about the actual exploration
         json_output[TraceData.EXPLORATION] = []
         explored_attribute_sets = self.get_explored_attribute_sets()
-        for i, explr_set_information in enumerate(explored_attribute_sets):
-            explr_set_information[TraceData.ATTRIBUTE_SET_ID] = i
-            json_output[TraceData.EXPLORATION].append(explr_set_information)
+        for i, explored_set_information in enumerate(explored_attribute_sets):
+            explored_set_information[TraceData.ATTRIBUTE_SET_ID] = i
+            json_output[TraceData.EXPLORATION].append(explored_set_information)
 
         # Save the exploration data as a json file
         with open(save_path, 'w+') as save_file:
