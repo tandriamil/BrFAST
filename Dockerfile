@@ -24,9 +24,12 @@ ARG USER_GID=${USER_UID}
 
 # ================================ Root part ===================================
 
+# Install the packages, note that we use the BuildKit caches to mutualize the
+# packages downloaded by apt and pip
 # - Create the non-root user
-# - Update the base packages, and install Poetry (we use the BuildKit caches to
-#   mutualize the packages downloaded by apt and pip)
+# - Update the base packages
+# - Install the necessary packages (gcc for building modin dependencies)
+# - Install Poetry and upgrade pip
 # - Remove the temporary files
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/root/.cache/pip,sharing=locked \
@@ -34,6 +37,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     useradd --no-log-init --uid ${USER_UID} --gid ${USER_GID} --create-home ${USERNAME} && \
     apt update && \
     apt upgrade -y && \
+    apt install -y --no-install-recommends gcc python3-dev && \
     apt dist-upgrade -y && \
     pip install --upgrade pip poetry && \
     apt autoremove -y && \

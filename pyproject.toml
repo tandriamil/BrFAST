@@ -11,9 +11,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11,<3.13"
-dask = "2023.10.1"
 flask = "3.0.0"
 loguru = "0.7.2"
+modin = {version = "0.25.0", extras = ["dask"]}
 pandas = "2.1.2"
 python-dateutil = "2.8.2"
 scipy = "1.11.3"
