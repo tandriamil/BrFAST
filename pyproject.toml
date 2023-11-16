@@ -14,7 +14,12 @@ python = "^3.11,<3.13"
 cython = "3.0.5"
 flask = "3.0.0"
 loguru = "0.7.2"
-modin = {version = "0.25.1", extras = ["all"]}
+# arm64 does not support unidist for now, as there is no supported version of
+# mpi4py-mpich
+modin = [
+    {markers = "platform_machine == 'x86_64'", version = "0.25.1", extras = ["all"]},
+    {markers = "platform_machine == 'arm64'", version = "0.25.1", extras = ["ray", "dask"]}
+]
 pandas = "2.1.3"
 python-dateutil = "2.8.2"
 scipy = "1.11.3"
