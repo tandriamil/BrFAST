@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6.0
-FROM python:3.12.0-slim-bookworm AS brfast-base-image
+FROM python:3.11.6-slim-bookworm AS brfast-base-image
 
 # ============================ Configuration part ==============================
 
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     useradd --no-log-init --uid ${USER_UID} --gid ${USER_GID} --create-home ${USERNAME} && \
     apt update && \
     apt upgrade -y && \
-    apt install -y --no-install-recommends gcc python3-dev && \
+    apt install -y --no-install-recommends gcc libopenmpi-dev python3-dev && \
     apt dist-upgrade -y && \
     pip install --upgrade pip poetry && \
     apt autoremove -y && \
