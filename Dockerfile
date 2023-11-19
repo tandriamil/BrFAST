@@ -74,10 +74,10 @@ RUN poetry install --with dev
 COPY --chown=${USERNAME} tests/ tests/
 
 # The default command is to launch the tests
-CMD ["poetry", "run", "coverage", "run", "-m", "unittest", "discover", "-s", "tests"]
+CMD poetry run coverage run -m unittest discover -s tests
 
 
 FROM brfast-base-image
 
 # Launch the Flask application as the default command
-CMD ["poetry", "run", "python", "-m", "flask", "run"]
+CMD poetry run python -m flask run
